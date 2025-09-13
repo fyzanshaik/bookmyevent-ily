@@ -121,7 +121,7 @@ type Querier interface {
 	//      (e.total_capacity - e.available_seats) as tickets_sold,
 	//      ROUND(((e.total_capacity - e.available_seats)::decimal / e.total_capacity::decimal) * 100, 2) as capacity_utilization,
 	//      e.base_price,
-	//      ((e.total_capacity - e.available_seats) * e.base_price) as estimated_revenue
+	//      ROUND((e.total_capacity - e.available_seats) * e.base_price::decimal, 2) as estimated_revenue
 	//  FROM events e
 	//  WHERE e.event_id = $1
 	GetEventAnalytics(ctx context.Context, eventID uuid.UUID) (GetEventAnalyticsRow, error)

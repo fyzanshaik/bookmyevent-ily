@@ -46,46 +46,46 @@ WHERE e.status = 'published'
 
 -- CRITICAL: Get Event for Booking (with row-level lock)
 -- name: GetEventForBooking :one
-SELECT event_id, available_seats, total_capacity, max_tickets_per_booking, 
+SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
        status, version, base_price, name
-FROM events 
-WHERE event_id = $1 
+FROM events
+WHERE event_id = $1
   AND status = 'published'
   AND available_seats > 0
 FOR UPDATE;
 
 -- CRITICAL: Update Available Seats with Optimistic Locking
 -- name: UpdateEventAvailability :one
-UPDATE events 
+UPDATE events
 SET available_seats = available_seats - $2,
     version = version + 1,
     updated_at = CURRENT_TIMESTAMP,
-    status = CASE 
+    status = CASE
         WHEN (available_seats - $2) = 0 THEN 'sold_out'::text
         ELSE status
     END
-WHERE event_id = $1 
+WHERE event_id = $1
   AND version = $3
   AND available_seats >= $2
 RETURNING event_id, available_seats, status, version;
 
 -- CRITICAL: Return Seats (for cancellations)
 -- name: ReturnEventSeats :one
-UPDATE events 
+UPDATE events
 SET available_seats = available_seats + $2,
     version = version + 1,
     updated_at = CURRENT_TIMESTAMP,
-    status = CASE 
+    status = CASE
         WHEN status = 'sold_out' AND (available_seats + $2) > 0 THEN 'published'::text
         ELSE status
     END
-WHERE event_id = $1 
+WHERE event_id = $1
   AND version = $3
 RETURNING event_id, available_seats, status, version;
 
 -- UPDATE EVENT (Admin)
 -- name: UpdateEvent :one
-UPDATE events 
+UPDATE events
 SET name = COALESCE($2, name),
     description = COALESCE($3, description),
     venue_id = COALESCE($4, venue_id),
@@ -105,11 +105,11 @@ RETURNING *;
 
 -- DELETE EVENT (Admin)
 -- name: DeleteEvent :exec
-UPDATE events 
+UPDATE events
 SET status = 'cancelled',
     updated_at = CURRENT_TIMESTAMP,
     version = version + 1
-WHERE event_id = $1 
+WHERE event_id = $1
   AND version = $2;
 
 -- LIST EVENTS BY ADMIN
@@ -123,7 +123,7 @@ LIMIT $1 OFFSET $2;
 
 -- GET EVENT ANALYTICS (Admin)
 -- name: GetEventAnalytics :one
-SELECT 
+SELECT
     e.event_id,
     e.name,
     e.total_capacity,
@@ -131,12 +131,12 @@ SELECT
     (e.total_capacity - e.available_seats) as tickets_sold,
     ROUND(((e.total_capacity - e.available_seats)::decimal / e.total_capacity::decimal) * 100, 2) as capacity_utilization,
     e.base_price,
-    ((e.total_capacity - e.available_seats) * e.base_price) as estimated_revenue
+    ROUND((e.total_capacity - e.available_seats) * e.base_price::decimal, 2) as estimated_revenue
 FROM events e
 WHERE e.event_id = $1;
 
 -- Check if event exists and is modifiable
 -- name: CheckEventOwnership :one
 SELECT event_id, created_by, status, version
-FROM events 
+FROM events
 WHERE event_id = $1 AND created_by = $2;

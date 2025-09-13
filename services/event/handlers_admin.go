@@ -33,13 +33,11 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check for nil or zero UUID
 	if requestBody.VenueID == uuid.Nil {
 		utils.RespondWithError(w, http.StatusBadRequest, "venue_id is required")
 		return
 	}
 
-	// Validate dates
 	now := time.Now()
 	if requestBody.StartDatetime.Before(now) {
 		utils.RespondWithError(w, http.StatusBadRequest, "Start datetime must be in the future")
@@ -56,13 +54,11 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate capacity
 	if requestBody.TotalCapacity <= 0 {
 		utils.RespondWithError(w, http.StatusBadRequest, "Total capacity must be positive")
 		return
 	}
 
-	// Validate price
 	if requestBody.BasePrice < 0 {
 		utils.RespondWithError(w, http.StatusBadRequest, "Base price cannot be negative")
 		return
@@ -91,7 +87,9 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	event, err := cfg.DB.CreateEvent(r.Context(), params)
 	if err != nil {
 		cfg.Logger.Error("Failed to create event", "error", err)
-		if strings.Contains(err.Error(), "foreign key") || strings.Contains(err.Error(), "violates foreign key constraint") {
+		if strings.Contains(err.Error(), "foreign key") ||
+			strings.Contains(err.Error(), "violates foreign key constraint") ||
+			strings.Contains(err.Error(), "fk_venue") {
 			utils.RespondWithError(w, http.StatusBadRequest, "Invalid venue ID - venue does not exist")
 			return
 		}
@@ -155,8 +153,7 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build update parameters - need to handle pointer fields from UpdateEventRequest
-	// Get current event to use as defaults for unspecified fields
+
 	currentEvent, err := cfg.DB.GetEventByID(r.Context(), eventID)
 	if err != nil {
 		cfg.Logger.Error("Failed to get current event", "error", err)
@@ -467,7 +464,13 @@ func (cfg *APIConfig) GetEventAnalytics(w http.ResponseWriter, r *http.Request) 
 			}
 			return price
 		}(),
-		EstimatedRevenue: float64(analytics.EstimatedRevenue),
+		EstimatedRevenue: func() float64 {
+			var revenue float64
+			if _, err := fmt.Sscanf(analytics.EstimatedRevenue, "%f", &revenue); err != nil {
+				return 0.0
+			}
+			return revenue
+		}(),
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
