@@ -81,9 +81,6 @@ type LogoutResponse struct {
 	Message string `json:"message"`
 }
 
-
-
-
 type TokenVerificationResponse struct {
 	UserID uuid.UUID `json:"user_id"`
 	Email  string    `json:"email"`

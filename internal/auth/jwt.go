@@ -9,7 +9,6 @@ import (
 	"github.com/fyzanshaik/bookmyevent-ily/internal/constants"
 )
 
-// MakeJWT creates a new JWT token for a user
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
 	claims := jwt.RegisteredClaims{
 		Issuer:    constants.JWTIssuer,
@@ -28,7 +27,6 @@ func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (str
 	return signedToken, nil
 }
 
-// ValidateJWT validates a JWT token and returns the user ID
 func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (any, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

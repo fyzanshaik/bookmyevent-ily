@@ -7,9 +7,9 @@ import (
 )
 
 type UserServiceConfig struct {
-	Port                string
-	DatabaseURL         string
-	DatabaseReplicaURL  string
+	Port               string
+	DatabaseURL        string
+	DatabaseReplicaURL string
 	JWTSecret          string
 	JWTAccessDuration  time.Duration
 	JWTRefreshDuration time.Duration
@@ -20,40 +20,46 @@ type UserServiceConfig struct {
 
 func LoadUserServiceConfig() *UserServiceConfig {
 	return &UserServiceConfig{
-		Port:                getEnv("USER_SERVICE_PORT", "8001"),
-		DatabaseURL:         getEnvRequired("USER_SERVICE_DB_URL"),
-		DatabaseReplicaURL:  getEnv("USER_SERVICE_DB_REPLICA_URL", ""),
+		Port:               getEnv("USER_SERVICE_PORT", "8001"),
+		DatabaseURL:        getEnvRequired("USER_SERVICE_DB_URL"),
+		DatabaseReplicaURL: getEnv("USER_SERVICE_DB_REPLICA_URL", ""),
 		JWTSecret:          getEnvRequired("JWT_SECRET"),
 		JWTAccessDuration:  getDuration("JWT_ACCESS_TOKEN_DURATION", 15*time.Minute),
 		JWTRefreshDuration: getDuration("JWT_REFRESH_TOKEN_DURATION", 7*24*time.Hour),
 		InternalAPIKey:     getEnvRequired("INTERNAL_API_KEY"),
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
-		Environment:       getEnv("ENVIRONMENT", "development"),
+		LogLevel:           getEnv("LOG_LEVEL", "info"),
+		Environment:        getEnv("ENVIRONMENT", "development"),
 	}
 }
 
-// Future service configs can be added here
 type EventServiceConfig struct {
-	Port                string
-	DatabaseURL         string
-	DatabaseReplicaURL  string
+	Port               string
+	DatabaseURL        string
+	DatabaseReplicaURL string
+	JWTSecret          string
+	JWTAccessDuration  time.Duration
+	JWTRefreshDuration time.Duration
 	InternalAPIKey     string
 	UserServiceURL     string
 	LogLevel           string
+	Environment        string
 }
 
 func LoadEventServiceConfig() *EventServiceConfig {
 	return &EventServiceConfig{
-		Port:                getEnv("EVENT_SERVICE_PORT", "8002"),
-		DatabaseURL:         getEnvRequired("EVENT_SERVICE_DB_URL"),
-		DatabaseReplicaURL:  getEnv("EVENT_SERVICE_DB_REPLICA_URL", ""),
+		Port:               getEnv("EVENT_SERVICE_PORT", "8002"),
+		DatabaseURL:        getEnvRequired("EVENT_SERVICE_DB_URL"),
+		DatabaseReplicaURL: getEnv("EVENT_SERVICE_DB_REPLICA_URL", ""),
+		JWTSecret:          getEnvRequired("JWT_SECRET"),
+		JWTAccessDuration:  getDuration("JWT_ACCESS_TOKEN_DURATION", 15*time.Minute),
+		JWTRefreshDuration: getDuration("JWT_REFRESH_TOKEN_DURATION", 7*24*time.Hour),
 		InternalAPIKey:     getEnvRequired("INTERNAL_API_KEY"),
 		UserServiceURL:     getEnvRequired("USER_SERVICE_URL"),
-		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		LogLevel:           getEnv("LOG_LEVEL", "info"),
+		Environment:        getEnv("ENVIRONMENT", "development"),
 	}
 }
 
-// Helper functions
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -74,7 +80,7 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	duration, err := time.ParseDuration(value)
 	if err != nil {
 		return defaultValue
@@ -87,7 +93,7 @@ func getInt(key string, defaultValue int) int {
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	intValue, err := strconv.Atoi(value)
 	if err != nil {
 		return defaultValue
@@ -100,7 +106,7 @@ func getBool(key string, defaultValue bool) bool {
 	if value == "" {
 		return defaultValue
 	}
-	
+
 	boolValue, err := strconv.ParseBool(value)
 	if err != nil {
 		return defaultValue

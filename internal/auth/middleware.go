@@ -8,14 +8,15 @@ import (
 	"github.com/fyzanshaik/bookmyevent-ily/internal/utils"
 )
 
-// UserContextKey is the key used to store user ID in context
 type UserContextKey string
 
+type AdminContextKey string
+
 const (
-	UserIDKey UserContextKey = "user_id"
+	UserIDKey  UserContextKey  = "user_id"
+	AdminIDKey AdminContextKey = "admin_id"
 )
 
-// RequireAuth middleware that requires valid JWT authentication
 func RequireAuth(jwtSecret string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +32,6 @@ func RequireAuth(jwtSecret string) func(http.HandlerFunc) http.HandlerFunc {
 				return
 			}
 
-			// Add user ID to context
 			ctx := context.WithValue(r.Context(), UserIDKey, userID)
 			r = r.WithContext(ctx)
 
@@ -40,7 +40,6 @@ func RequireAuth(jwtSecret string) func(http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// RequireInternalAuth middleware for inter-service communication
 func RequireInternalAuth(apiKey string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +59,36 @@ func RequireInternalAuth(apiKey string) func(http.HandlerFunc) http.HandlerFunc 
 	}
 }
 
-// GetUserIDFromContext extracts user ID from request context
 func GetUserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	userID, ok := ctx.Value(UserIDKey).(uuid.UUID)
 	return userID, ok
+}
+
+func RequireAdminAuth(jwtSecret string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			token, err := GetBearerToken(r.Header)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+				return
+			}
+
+			claims, err := ValidateAdminJWT(token, jwtSecret)
+			if err != nil {
+				utils.RespondWithError(w, http.StatusUnauthorized, "Invalid admin token")
+				return
+			}
+
+			// Add admin ID to context
+			ctx := context.WithValue(r.Context(), AdminIDKey, claims.AdminID)
+			r = r.WithContext(ctx)
+
+			next(w, r)
+		}
+	}
+}
+
+func GetAdminIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	adminID, ok := ctx.Value(AdminIDKey).(uuid.UUID)
+	return adminID, ok
 }

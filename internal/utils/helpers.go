@@ -2,7 +2,9 @@ package utils
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -21,4 +23,23 @@ func GenerateRandomString(length int) (string, error) {
 func GenerateRequestID() string {
 	id, _ := GenerateRandomString(16)
 	return id
+}
+
+func StringPtrFromNullString(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
+}
+
+func ParsePrice(priceStr sql.NullString) float64 {
+	if !priceStr.Valid {
+		return 0.0
+	}
+
+	var price float64
+	if _, err := fmt.Sscanf(priceStr.String, "%f", &price); err != nil {
+		return 0.0
+	}
+	return price
 }

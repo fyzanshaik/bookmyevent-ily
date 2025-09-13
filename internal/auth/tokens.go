@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// MakeRefreshToken generates a new random refresh token
 func MakeRefreshToken() (string, error) {
 	randomBytes := make([]byte, 32)
 
@@ -21,7 +20,6 @@ func MakeRefreshToken() (string, error) {
 	return refreshToken, nil
 }
 
-// GetBearerToken extracts Bearer token from Authorization header
 func GetBearerToken(headers http.Header) (string, error) {
 	authorizationHeader := headers.Get("Authorization")
 	if authorizationHeader == "" {
@@ -36,7 +34,6 @@ func GetBearerToken(headers http.Header) (string, error) {
 	return splitHeader[1], nil
 }
 
-// GetAPIKey extracts API key from Authorization header
 func GetAPIKey(headers http.Header) (string, error) {
 	authorizationHeader := headers.Get("Authorization")
 	if authorizationHeader == "" {

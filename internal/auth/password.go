@@ -6,7 +6,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HashedPassword hashes a password using bcrypt
 func HashedPassword(password string) (string, error) {
 	if password == "" {
 		return "", fmt.Errorf("password empty")
@@ -18,7 +17,6 @@ func HashedPassword(password string) (string, error) {
 	return string(hashedPassword), nil
 }
 
-// CheckPasswordHash verifies a password against its hash
 func CheckPasswordHash(hashedPassword, password string) error {
 	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)); err != nil {
 		return fmt.Errorf("password doesn't match hash value: %w", err)
