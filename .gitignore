@@ -1,0 +1,44 @@
+# Go build artifacts
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test files
+*.test
+
+# Go coverage files
+*.out
+
+# Go modules
+go.sum
+
+# Environment variables
+.env
+
+# Docker volumes
+/data/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
