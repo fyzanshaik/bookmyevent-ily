@@ -8,3 +8,5 @@ require (
 	github.com/lib/pq v1.10.9
 	golang.org/x/crypto v0.42.0
 )
+
+require github.com/sqlc-dev/pqtype v0.3.0 // indirect
