@@ -28,18 +28,43 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if requestBody.Name == "" || requestBody.VenueID == uuid.Nil || requestBody.EventType == "" {
-		utils.RespondWithError(w, http.StatusBadRequest, "Name, venue_id, and event_type are required")
+	if requestBody.Name == "" || requestBody.EventType == "" {
+		utils.RespondWithError(w, http.StatusBadRequest, "Name and event_type are required")
 		return
 	}
 
-	if requestBody.StartDatetime.After(requestBody.EndDatetime) {
+	// Check for nil or zero UUID
+	if requestBody.VenueID == uuid.Nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "venue_id is required")
+		return
+	}
+
+	// Validate dates
+	now := time.Now()
+	if requestBody.StartDatetime.Before(now) {
+		utils.RespondWithError(w, http.StatusBadRequest, "Start datetime must be in the future")
+		return
+	}
+
+	if requestBody.EndDatetime.Before(now) {
+		utils.RespondWithError(w, http.StatusBadRequest, "End datetime must be in the future")
+		return
+	}
+
+	if requestBody.StartDatetime.After(requestBody.EndDatetime) || requestBody.StartDatetime.Equal(requestBody.EndDatetime) {
 		utils.RespondWithError(w, http.StatusBadRequest, "Start datetime must be before end datetime")
 		return
 	}
 
+	// Validate capacity
 	if requestBody.TotalCapacity <= 0 {
 		utils.RespondWithError(w, http.StatusBadRequest, "Total capacity must be positive")
+		return
+	}
+
+	// Validate price
+	if requestBody.BasePrice < 0 {
+		utils.RespondWithError(w, http.StatusBadRequest, "Base price cannot be negative")
 		return
 	}
 
@@ -56,7 +81,7 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		StartDatetime:        requestBody.StartDatetime,
 		EndDatetime:          requestBody.EndDatetime,
 		TotalCapacity:        requestBody.TotalCapacity,
-		AvailableSeats:       requestBody.TotalCapacity, 
+		AvailableSeats:       requestBody.TotalCapacity,
 		BasePrice:            fmt.Sprintf("%.2f", requestBody.BasePrice),
 		MaxTicketsPerBooking: sql.NullInt32{Int32: maxTickets, Valid: true},
 		Status:               sql.NullString{String: "draft", Valid: true},
@@ -66,8 +91,8 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	event, err := cfg.DB.CreateEvent(r.Context(), params)
 	if err != nil {
 		cfg.Logger.Error("Failed to create event", "error", err)
-		if strings.Contains(err.Error(), "foreign key") {
-			utils.RespondWithError(w, http.StatusBadRequest, "Invalid venue ID")
+		if strings.Contains(err.Error(), "foreign key") || strings.Contains(err.Error(), "violates foreign key constraint") {
+			utils.RespondWithError(w, http.StatusBadRequest, "Invalid venue ID - venue does not exist")
 			return
 		}
 		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create event")
@@ -212,6 +237,10 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 
 	updatedEvent, err := cfg.DB.UpdateEvent(r.Context(), params)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			utils.RespondWithError(w, http.StatusConflict, "Event was updated by another admin. Please refresh and try again.")
+			return
+		}
 		if strings.Contains(err.Error(), "version") {
 			utils.RespondWithError(w, http.StatusConflict, "Event was updated by another admin. Please refresh and try again.")
 			return
@@ -374,10 +403,10 @@ func (cfg *APIConfig) ListAdminEvents(w http.ResponseWriter, r *http.Request) {
 
 	response := EventListResponse{
 		Events:  eventResponses,
-		Total:   int64(len(eventResponses)), 
+		Total:   int64(len(eventResponses)),
 		Page:    page,
 		Limit:   limit,
-		HasMore: len(eventResponses) == limit, 
+		HasMore: len(eventResponses) == limit,
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
