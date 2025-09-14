@@ -301,7 +301,6 @@ func (cfg *APIConfig) ListPublishedEvents(w http.ResponseWriter, r *http.Request
 	dateFromStr := r.URL.Query().Get("date_from")
 	dateToStr := r.URL.Query().Get("date_to")
 
-	// Use zero time as "no limit" values - the SQL query will handle these properly
 	var dateFrom, dateTo time.Time
 
 	if dateFromStr != "" {

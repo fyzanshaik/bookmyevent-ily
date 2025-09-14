@@ -1,17 +1,16 @@
 -- +goose Up
--- Create bookings table - core booking entity
 CREATE TABLE bookings (
     booking_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL,                    -- Links to User Service
-    event_id UUID NOT NULL,                   -- Links to Event Service
-    booking_reference VARCHAR(20) UNIQUE NOT NULL, -- Human-readable: EVT-ABC123
+    user_id UUID NOT NULL,                    
+    event_id UUID NOT NULL,                   
+    booking_reference VARCHAR(20) UNIQUE NOT NULL, 
     quantity INTEGER NOT NULL,
     total_amount DECIMAL(10, 2) NOT NULL,
-    status VARCHAR(20) NOT NULL,              -- pending, confirmed, cancelled, expired
-    payment_status VARCHAR(20) NOT NULL,      -- pending, completed, failed, refunded
-    idempotency_key VARCHAR(255) UNIQUE,      -- Prevent duplicate bookings
+    status VARCHAR(20) NOT NULL,             
+    payment_status VARCHAR(20) NOT NULL,      
+    idempotency_key VARCHAR(255) UNIQUE,     
     booked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP,                     -- 5-minute expiry for pending bookings
+    expires_at TIMESTAMP,                    
     confirmed_at TIMESTAMP,
     cancelled_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

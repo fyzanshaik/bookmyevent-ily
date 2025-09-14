@@ -1,4 +1,3 @@
--- Booking CRUD operations
 
 -- name: CreateBooking :one
 INSERT INTO bookings (

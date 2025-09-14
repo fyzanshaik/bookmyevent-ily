@@ -7,6 +7,6 @@ import (
 func main() {
 	appConfig, db := user.InitUserService()
 	defer db.Close()
-	
+
 	user.StartServer(appConfig)
 }

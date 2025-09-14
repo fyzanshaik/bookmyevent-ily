@@ -333,7 +333,6 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 				UpdatedAt:    venue.UpdatedAt.Time,
 			}
 
-			// Use background context instead of request context to avoid cancellation
 			ctx := context.Background()
 			if err := cfg.SearchClient.UpdateEvent(ctx, response, venueResp); err != nil {
 				cfg.Logger.Error("Failed to update event in search service", "error", err, "event_id", updatedEvent.EventID)

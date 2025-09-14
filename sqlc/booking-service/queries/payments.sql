@@ -1,4 +1,3 @@
--- Payment operations
 
 -- name: CreatePayment :one
 INSERT INTO payments (

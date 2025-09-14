@@ -63,7 +63,6 @@ func (c *UserServiceClient) VerifyToken(ctx context.Context, token string) (*Use
 	return &user, nil
 }
 
-// Event Service Integration
 type EventServiceClient struct {
 	BaseURL    string
 	HTTPClient *http.Client

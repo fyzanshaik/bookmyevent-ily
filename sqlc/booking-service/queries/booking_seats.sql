@@ -1,4 +1,3 @@
--- Booking seats operations (future feature)
 
 -- name: CreateBookingSeat :one
 INSERT INTO booking_seats (

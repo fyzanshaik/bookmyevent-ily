@@ -1,6 +1,4 @@
--- Event Management Queries with Concurrency Control
 
--- CREATE EVENT
 -- name: CreateEvent :one
 INSERT INTO events (
     name, description, venue_id, event_type, start_datetime, end_datetime,
@@ -11,14 +9,12 @@ INSERT INTO events (
 )
 RETURNING *;
 
--- GET EVENT BY ID
 -- name: GetEventByID :one
 SELECT e.*, v.name as venue_name, v.address, v.city, v.state, v.country
 FROM events e
 JOIN venues v ON e.venue_id = v.venue_id
 WHERE e.event_id = $1;
 
--- LIST PUBLISHED EVENTS (Public API - High Traffic)
 -- name: ListPublishedEvents :many
 SELECT e.*, v.name as venue_name, v.city, v.state
 FROM events e
@@ -32,7 +28,6 @@ WHERE e.status = 'published'
 ORDER BY e.start_datetime ASC
 LIMIT $1 OFFSET $2;
 
--- COUNT PUBLISHED EVENTS (for pagination)
 -- name: CountPublishedEvents :one
 SELECT COUNT(*)
 FROM events e
@@ -44,7 +39,6 @@ WHERE e.status = 'published'
   AND ($3::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $3)
   AND ($4::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $4);
 
--- CRITICAL: Get Event for Booking (with row-level lock)
 -- name: GetEventForBooking :one
 SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
        status, version, base_price, name
@@ -54,7 +48,6 @@ WHERE event_id = $1
   AND available_seats > 0
 FOR UPDATE;
 
--- CRITICAL: Update Available Seats with Optimistic Locking
 -- name: UpdateEventAvailability :one
 UPDATE events
 SET available_seats = available_seats - $2,
@@ -69,7 +62,6 @@ WHERE event_id = $1
   AND available_seats >= $2
 RETURNING event_id, available_seats, status, version;
 
--- CRITICAL: Return Seats (for cancellations)
 -- name: ReturnEventSeats :one
 UPDATE events
 SET available_seats = available_seats + $2,
@@ -83,7 +75,6 @@ WHERE event_id = $1
   AND version = $3
 RETURNING event_id, available_seats, status, version;
 
--- UPDATE EVENT (Admin)
 -- name: UpdateEvent :one
 UPDATE events
 SET name = COALESCE($2, name),
@@ -103,7 +94,6 @@ WHERE event_id = $1
   AND version = $13
 RETURNING *;
 
--- DELETE EVENT (Admin)
 -- name: DeleteEvent :exec
 UPDATE events
 SET status = 'cancelled',
@@ -112,7 +102,6 @@ SET status = 'cancelled',
 WHERE event_id = $1
   AND version = $2;
 
--- LIST EVENTS BY ADMIN
 -- name: ListEventsByAdmin :many
 SELECT e.*, v.name as venue_name, v.city
 FROM events e
@@ -121,7 +110,6 @@ WHERE e.created_by = $3
 ORDER BY e.created_at DESC
 LIMIT $1 OFFSET $2;
 
--- GET EVENT ANALYTICS (Admin)
 -- name: GetEventAnalytics :one
 SELECT
     e.event_id,
@@ -135,7 +123,6 @@ SELECT
 FROM events e
 WHERE e.event_id = $1;
 
--- Check if event exists and is modifiable
 -- name: CheckEventOwnership :one
 SELECT event_id, created_by, status, version
 FROM events

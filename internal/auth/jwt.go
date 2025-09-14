@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fyzanshaik/bookmyevent-ily/internal/constants"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/fyzanshaik/bookmyevent-ily/internal/constants"
 )
 
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
@@ -47,7 +47,7 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	if !ok {
 		return uuid.Nil, fmt.Errorf("could not parse claims")
 	}
-	
+
 	userID, err := uuid.Parse(claims.Subject)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("invalid user ID in token: %w", err)

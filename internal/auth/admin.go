@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fyzanshaik/bookmyevent-ily/internal/constants"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/fyzanshaik/bookmyevent-ily/internal/constants"
 )
 
 type AdminClaims struct {

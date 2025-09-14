@@ -16,8 +16,8 @@ kill-services:
 help:
 	@echo "Available commands:"
 	@echo "  make docker-up                         - Start PostgreSQL database"
-	@echo "  make docker-redis-up                   - Start Redis cluster"
-	@echo "  make docker-full-up                    - Start all infrastructure (PostgreSQL + Redis)"
+	@echo "  make docker-redis-up                   - Start Redis"
+	@echo "  make docker-full-up                    - Start all infrastructure (PostgreSQL + Redis + Elasticsearch)"
 	@echo "  make docker-down                       - Stop all containers"
 	@echo "  make kill-services                     - Stop all running services"
 	@echo "  make migrate-up SERVICE=booking        - Run migrations for service (user|event|booking)"
@@ -37,14 +37,14 @@ docker-up: check-env
 	@sleep 5
 
 docker-redis-up: check-env
-	@echo "Starting Redis cluster..."
-	@export $$(cat .env | grep -v '^#' | xargs) && docker compose up -d redis redis-replica
+	@echo "Starting Redis..."
+	@export $$(cat .env | grep -v '^#' | xargs) && docker compose up -d redis
 	@echo "Waiting for Redis to be ready..."
 	@sleep 3
 
 docker-full-up: check-env
 	@echo "Starting all infrastructure (PostgreSQL + Redis + Elasticsearch)..."
-	@export $$(cat .env | grep -v '^#' | xargs) && docker compose up -d postgres redis redis-replica elasticsearch
+	@export $$(cat .env | grep -v '^#' | xargs) && docker compose up -d postgres redis elasticsearch
 	@echo "Waiting for services to be ready..."
 	@sleep 15
 

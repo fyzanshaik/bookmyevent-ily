@@ -1,4 +1,3 @@
--- Waitlist operations
 
 -- name: JoinWaitlist :one
 INSERT INTO waitlist (

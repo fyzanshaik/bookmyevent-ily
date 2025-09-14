@@ -7,6 +7,6 @@ import (
 func main() {
 	appConfig, db := booking.InitBookingService()
 	defer db.Close()
-	
+
 	booking.StartServer(appConfig)
 }

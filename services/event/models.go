@@ -211,9 +211,9 @@ type SuccessResponse struct {
 
 type ErrorResponse struct {
 	Error struct {
-		Code      string      `json:"code"`
-		Message   string      `json:"message"`
-		Details   interface{} `json:"details,omitempty"`
-		Timestamp time.Time   `json:"timestamp"`
+		Code      string    `json:"code"`
+		Message   string    `json:"message"`
+		Details   any       `json:"details,omitempty"`
+		Timestamp time.Time `json:"timestamp"`
 	} `json:"error"`
 }

@@ -37,21 +37,20 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis Replica (for read scaling - optional for development)
-  redis-replica:
-    image: redis:7-alpine
-    container_name: evently_redis_replica
-    command: redis-server --appendonly yes --replicaof redis 6379 --maxmemory 256mb --maxmemory-policy allkeys-lru
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - evently_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+  # redis-replica:
+  #   image: redis:7-alpine
+  #   container_name: evently_redis_replica
+  #   command: redis-server --appendonly yes --replicaof redis 6379 --maxmemory 256mb --maxmemory-policy allkeys-lru
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - evently_network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
 
   # Elasticsearch (for search service)
   elasticsearch:

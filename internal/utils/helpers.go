@@ -83,15 +83,15 @@ func FormatCurrency(amount float64, currency string) string {
 
 func CalculateRefundAmount(originalAmount float64, bookingTime time.Time, eventDateTime time.Time) float64 {
 	hoursUntilEvent := eventDateTime.Sub(time.Now()).Hours()
-	
+
 	if hoursUntilEvent > 24 {
 		return originalAmount
 	}
-	
+
 	if hoursUntilEvent > 2 {
 		return originalAmount * 0.5
 	}
-	
+
 	return 0.0
 }
 

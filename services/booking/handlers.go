@@ -572,7 +572,7 @@ func (cfg *APIConfig) GetUserBookings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"bookings":    bookingList,
 		"total":       total,
 		"page":        page,
