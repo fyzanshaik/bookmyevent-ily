@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, Eye, EyeOff, Shield } from 'lucide-react';
 
-const AdminLogin = () => {
+export const AdminLogin = () => {
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -31,6 +31,19 @@ const AdminLogin = () => {
             [e.target.name]: e.target.value
         });
         setError('');
+    };
+
+    const handleQuickLogin = async (email, password) => {
+        setLoading(true);
+        setError('');
+        const result = await adminLogin({ email, password });
+        if (result.success) {
+            navigate(from, { replace: true });
+        } else {
+            setError(result.error);
+            setFormData({ email, password });
+        }
+        setLoading(false);
     };
 
     const handleSubmit = async (e) => {
@@ -132,14 +145,17 @@ const AdminLogin = () => {
                     </Link>
                 </div>
 
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
-                    <strong>Demo Admin Credentials:</strong><br />
-                    Email: admin@bookmyevent.com<br />
-                    Password: admin123
+                <div className="mt-6 border-t pt-4">
+                    <p className="text-center text-sm text-gray-500 mb-2">Or quick login as:</p>
+                    <div className="flex flex-col space-y-2">
+                        <button type="button" onClick={() => handleQuickLogin('atlanadmin@mail.com', '11111111')} className="w-full text-sm border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50">
+                            Admin (atlanadmin@mail.com)
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     );
 };
 
-export default AdminLogin;
+

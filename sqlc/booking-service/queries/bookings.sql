@@ -50,6 +50,11 @@ SELECT * FROM bookings
 WHERE status = 'pending' AND expires_at < CURRENT_TIMESTAMP
 LIMIT $1;
 
+-- name: GetPendingBookings :many
+SELECT * FROM bookings 
+WHERE status = 'pending'
+LIMIT $1;
+
 -- name: GetBookingsForCleanup :many
 SELECT * FROM bookings 
 WHERE status = 'pending' AND expires_at < CURRENT_TIMESTAMP;

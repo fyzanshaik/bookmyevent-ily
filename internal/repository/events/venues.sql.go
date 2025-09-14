@@ -24,7 +24,7 @@ type CountVenuesParams struct {
 	Column2 string `json:"column_2"`
 }
 
-// COUNT VENUES (for pagination)
+// CountVenues
 //
 //	SELECT COUNT(*) FROM venues
 //	WHERE ($1::text IS NULL OR city ILIKE '%' || $1 || '%')
@@ -37,7 +37,6 @@ func (q *Queries) CountVenues(ctx context.Context, arg CountVenuesParams) (int64
 }
 
 const createVenue = `-- name: CreateVenue :one
-
 INSERT INTO venues (
     name, address, city, state, country, postal_code, capacity, layout_config
 ) VALUES (
@@ -57,8 +56,7 @@ type CreateVenueParams struct {
 	LayoutConfig pqtype.NullRawMessage `json:"layout_config"`
 }
 
-// Venue Management Queries
-// CREATE VENUE
+// CreateVenue
 //
 //	INSERT INTO venues (
 //	    name, address, city, state, country, postal_code, capacity, layout_config
@@ -98,7 +96,7 @@ const deleteVenue = `-- name: DeleteVenue :exec
 DELETE FROM venues WHERE venue_id = $1
 `
 
-// DELETE VENUE
+// DeleteVenue
 //
 //	DELETE FROM venues WHERE venue_id = $1
 func (q *Queries) DeleteVenue(ctx context.Context, venueID uuid.UUID) error {
@@ -110,7 +108,7 @@ const getVenueByID = `-- name: GetVenueByID :one
 SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues WHERE venue_id = $1
 `
 
-// GET VENUE BY ID
+// GetVenueByID
 //
 //	SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues WHERE venue_id = $1
 func (q *Queries) GetVenueByID(ctx context.Context, venueID uuid.UUID) (Venue, error) {
@@ -133,8 +131,8 @@ func (q *Queries) GetVenueByID(ctx context.Context, venueID uuid.UUID) (Venue, e
 }
 
 const getVenuesByCity = `-- name: GetVenuesByCity :many
-SELECT venue_id, name, capacity, address FROM venues 
-WHERE city = $1 
+SELECT venue_id, name, capacity, address FROM venues
+WHERE city = $1
 ORDER BY name
 `
 
@@ -145,7 +143,7 @@ type GetVenuesByCityRow struct {
 	Address  string    `json:"address"`
 }
 
-// GET VENUES BY CITY (for event creation dropdown)
+// GetVenuesByCity
 //
 //	SELECT venue_id, name, capacity, address FROM venues
 //	WHERE city = $1
@@ -193,7 +191,7 @@ type ListVenuesParams struct {
 	Column4 string `json:"column_4"`
 }
 
-// LIST VENUES
+// ListVenues
 //
 //	SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues
 //	WHERE ($3::text IS NULL OR city ILIKE '%' || $3 || '%')
@@ -242,16 +240,16 @@ func (q *Queries) ListVenues(ctx context.Context, arg ListVenuesParams) ([]Venue
 
 const searchVenues = `-- name: SearchVenues :many
 SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues
-WHERE name ILIKE '%' || $1 || '%' 
+WHERE name ILIKE '%' || $1 || '%'
    OR city ILIKE '%' || $1 || '%'
    OR address ILIKE '%' || $1 || '%'
-ORDER BY 
+ORDER BY
     CASE WHEN name ILIKE $1 || '%' THEN 1 ELSE 2 END,
     name
 LIMIT 10
 `
 
-// SEARCH VENUES
+// SearchVenues
 //
 //	SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues
 //	WHERE name ILIKE '%' || $1 || '%'
@@ -297,7 +295,7 @@ func (q *Queries) SearchVenues(ctx context.Context, dollar_1 sql.NullString) ([]
 }
 
 const updateVenue = `-- name: UpdateVenue :one
-UPDATE venues 
+UPDATE venues
 SET name = COALESCE($2, name),
     address = COALESCE($3, address),
     city = COALESCE($4, city),
@@ -323,7 +321,7 @@ type UpdateVenueParams struct {
 	LayoutConfig pqtype.NullRawMessage `json:"layout_config"`
 }
 
-// UPDATE VENUE
+// UpdateVenue
 //
 //	UPDATE venues
 //	SET name = COALESCE($2, name),

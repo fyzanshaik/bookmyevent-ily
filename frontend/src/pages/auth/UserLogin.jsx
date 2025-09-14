@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react';
 
-const UserLogin = () => {
+export const UserLogin = () => {
     const [formData, setFormData] = useState({
         email: '',
         password: ''
@@ -31,6 +31,19 @@ const UserLogin = () => {
             [e.target.name]: e.target.value
         });
         setError('');
+    };
+
+    const handleQuickLogin = async (email, password) => {
+        setLoading(true);
+        setError('');
+        const result = await userLogin({ email, password });
+        if (result.success) {
+            navigate(from, { replace: true });
+        } else {
+            setError(result.error);
+            setFormData({ email, password });
+        }
+        setLoading(false);
     };
 
     const handleSubmit = async (e) => {
@@ -131,9 +144,21 @@ const UserLogin = () => {
                         Admin Login
                     </Link>
                 </div>
+
+                <div className="mt-6 border-t pt-4">
+                    <p className="text-center text-sm text-gray-500 mb-2">Or quick login as:</p>
+                    <div className="flex flex-col space-y-2">
+                        <button type="button" onClick={() => handleQuickLogin('atlanuser1@mail.com', '11111111')} className="w-full text-sm border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50">
+                            User 1 (atlanuser1@mail.com)
+                        </button>
+                        <button type="button" onClick={() => handleQuickLogin('atlanuser2@mail.com', '11111111')} className="w-full text-sm border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50">
+                            User 2 (atlanuser2@mail.com)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
 
-export default UserLogin;
+

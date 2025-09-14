@@ -12,11 +12,8 @@ import (
 )
 
 type Querier interface {
-	// Booking CRUD operations
 	CreateBooking(ctx context.Context, db DBTX, arg CreateBookingParams) (Booking, error)
-	// Booking seats operations (future feature)
 	CreateBookingSeat(ctx context.Context, db DBTX, arg CreateBookingSeatParams) (BookingSeat, error)
-	// Payment operations
 	CreatePayment(ctx context.Context, db DBTX, arg CreatePaymentParams) (Payment, error)
 	DeleteBooking(ctx context.Context, db DBTX, bookingID uuid.UUID) error
 	DeleteBookingSeats(ctx context.Context, db DBTX, bookingID uuid.UUID) error
@@ -39,6 +36,7 @@ type Querier interface {
 	GetPaymentByGatewayTransactionID(ctx context.Context, db DBTX, gatewayTransactionID sql.NullString) (Payment, error)
 	GetPaymentByID(ctx context.Context, db DBTX, paymentID uuid.UUID) (Payment, error)
 	GetPaymentsForAnalytics(ctx context.Context, db DBTX, arg GetPaymentsForAnalyticsParams) ([]GetPaymentsForAnalyticsRow, error)
+	GetPendingBookings(ctx context.Context, db DBTX, limit int32) ([]Booking, error)
 	GetSeatsBySection(ctx context.Context, db DBTX, arg GetSeatsBySectionParams) ([]BookingSeat, error)
 	GetUserBookings(ctx context.Context, db DBTX, arg GetUserBookingsParams) ([]Booking, error)
 	GetUserBookingsCount(ctx context.Context, db DBTX, userID uuid.UUID) (int64, error)
@@ -49,10 +47,12 @@ type Querier interface {
 	GetWaitlistEntryByUserAndEvent(ctx context.Context, db DBTX, arg GetWaitlistEntryByUserAndEventParams) (Waitlist, error)
 	GetWaitlistPosition(ctx context.Context, db DBTX, arg GetWaitlistPositionParams) (GetWaitlistPositionRow, error)
 	GetWaitlistStats(ctx context.Context, db DBTX, eventID uuid.UUID) (GetWaitlistStatsRow, error)
-	// Waitlist operations
 	JoinWaitlist(ctx context.Context, db DBTX, arg JoinWaitlistParams) (Waitlist, error)
+	ReassignWaitlistPosition(ctx context.Context, db DBTX, arg ReassignWaitlistPositionParams) error
 	RemoveFromWaitlist(ctx context.Context, db DBTX, arg RemoveFromWaitlistParams) error
 	ReorderWaitlistAfterRemoval(ctx context.Context, db DBTX, arg ReorderWaitlistAfterRemovalParams) error
+	SetWaitlistOffered(ctx context.Context, db DBTX, arg SetWaitlistOfferedParams) (Waitlist, error)
+	SetWaitlistWaiting(ctx context.Context, db DBTX, waitlistID uuid.UUID) (Waitlist, error)
 	UpdateBookingPaymentStatus(ctx context.Context, db DBTX, arg UpdateBookingPaymentStatusParams) (Booking, error)
 	UpdateBookingSeatStatus(ctx context.Context, db DBTX, arg UpdateBookingSeatStatusParams) (BookingSeat, error)
 	UpdateBookingStatus(ctx context.Context, db DBTX, arg UpdateBookingStatusParams) (Booking, error)

@@ -31,7 +31,7 @@ type CheckEventOwnershipRow struct {
 	Version   int32          `json:"version"`
 }
 
-// Check if event exists and is modifiable
+// CheckEventOwnership
 //
 //	SELECT event_id, created_by, status, version
 //	FROM events
@@ -67,7 +67,7 @@ type CountPublishedEventsParams struct {
 	Column4 time.Time `json:"column_4"`
 }
 
-// COUNT PUBLISHED EVENTS (for pagination)
+// CountPublishedEvents
 //
 //	SELECT COUNT(*)
 //	FROM events e
@@ -91,7 +91,6 @@ func (q *Queries) CountPublishedEvents(ctx context.Context, arg CountPublishedEv
 }
 
 const createEvent = `-- name: CreateEvent :one
-
 INSERT INTO events (
     name, description, venue_id, event_type, start_datetime, end_datetime,
     total_capacity, available_seats, base_price, max_tickets_per_booking,
@@ -117,8 +116,7 @@ type CreateEventParams struct {
 	CreatedBy            uuid.UUID      `json:"created_by"`
 }
 
-// Event Management Queries with Concurrency Control
-// CREATE EVENT
+// CreateEvent
 //
 //	INSERT INTO events (
 //	    name, description, venue_id, event_type, start_datetime, end_datetime,
@@ -179,7 +177,7 @@ type DeleteEventParams struct {
 	Version int32     `json:"version"`
 }
 
-// DELETE EVENT (Admin)
+// DeleteEvent
 //
 //	UPDATE events
 //	SET status = 'cancelled',
@@ -217,7 +215,7 @@ type GetEventAnalyticsRow struct {
 	EstimatedRevenue    string    `json:"estimated_revenue"`
 }
 
-// GET EVENT ANALYTICS (Admin)
+// GetEventAnalytics
 //
 //	SELECT
 //	    e.event_id,
@@ -277,7 +275,7 @@ type GetEventByIDRow struct {
 	Country              string         `json:"country"`
 }
 
-// GET EVENT BY ID
+// GetEventByID
 //
 //	SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.address, v.city, v.state, v.country
 //	FROM events e
@@ -317,8 +315,7 @@ SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
        status, version, base_price, name
 FROM events
 WHERE event_id = $1
-  AND status = 'published'
-  AND available_seats > 0
+  AND (status = 'published' OR status = 'sold_out')
 FOR UPDATE
 `
 
@@ -333,14 +330,13 @@ type GetEventForBookingRow struct {
 	Name                 string         `json:"name"`
 }
 
-// CRITICAL: Get Event for Booking (with row-level lock)
+// GetEventForBooking
 //
 //	SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
 //	       status, version, base_price, name
 //	FROM events
 //	WHERE event_id = $1
-//	  AND status = 'published'
-//	  AND available_seats > 0
+//	  AND (status = 'published' OR status = 'sold_out')
 //	FOR UPDATE
 func (q *Queries) GetEventForBooking(ctx context.Context, eventID uuid.UUID) (GetEventForBookingRow, error) {
 	row := q.db.QueryRowContext(ctx, getEventForBooking, eventID)
@@ -394,7 +390,7 @@ type ListEventsByAdminRow struct {
 	City                 string         `json:"city"`
 }
 
-// LIST EVENTS BY ADMIN
+// ListEventsByAdmin
 //
 //	SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.city
 //	FROM events e
@@ -489,7 +485,7 @@ type ListPublishedEventsRow struct {
 	State                sql.NullString `json:"state"`
 }
 
-// LIST PUBLISHED EVENTS (Public API - High Traffic)
+// ListPublishedEvents
 //
 //	SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.city, v.state
 //	FROM events e
@@ -579,7 +575,7 @@ type ReturnEventSeatsRow struct {
 	Version        int32          `json:"version"`
 }
 
-// CRITICAL: Return Seats (for cancellations)
+// ReturnEventSeats
 //
 //	UPDATE events
 //	SET available_seats = available_seats + $2,
@@ -640,7 +636,7 @@ type UpdateEventParams struct {
 	Version              int32          `json:"version"`
 }
 
-// UPDATE EVENT (Admin)
+// UpdateEvent
 //
 //	UPDATE events
 //	SET name = COALESCE($2, name),
@@ -725,7 +721,7 @@ type UpdateEventAvailabilityRow struct {
 	Version        int32          `json:"version"`
 }
 
-// CRITICAL: Update Available Seats with Optimistic Locking
+// UpdateEventAvailability
 //
 //	UPDATE events
 //	SET available_seats = available_seats - $2,

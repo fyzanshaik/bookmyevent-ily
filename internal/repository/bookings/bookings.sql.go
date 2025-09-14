@@ -13,7 +13,6 @@ import (
 )
 
 const createBooking = `-- name: CreateBooking :one
-
 INSERT INTO bookings (
     user_id, event_id, booking_reference, quantity, total_amount, 
     status, payment_status, idempotency_key, expires_at
@@ -34,7 +33,6 @@ type CreateBookingParams struct {
 	ExpiresAt        sql.NullTime   `json:"expires_at"`
 }
 
-// Booking CRUD operations
 func (q *Queries) CreateBooking(ctx context.Context, db DBTX, arg CreateBookingParams) (Booking, error) {
 	row := db.QueryRowContext(ctx, createBooking,
 		arg.UserID,
@@ -338,6 +336,51 @@ LIMIT $1
 
 func (q *Queries) GetExpiredBookings(ctx context.Context, db DBTX, limit int32) ([]Booking, error) {
 	rows, err := db.QueryContext(ctx, getExpiredBookings, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Booking{}
+	for rows.Next() {
+		var i Booking
+		if err := rows.Scan(
+			&i.BookingID,
+			&i.UserID,
+			&i.EventID,
+			&i.BookingReference,
+			&i.Quantity,
+			&i.TotalAmount,
+			&i.Status,
+			&i.PaymentStatus,
+			&i.IdempotencyKey,
+			&i.BookedAt,
+			&i.ExpiresAt,
+			&i.ConfirmedAt,
+			&i.CancelledAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingBookings = `-- name: GetPendingBookings :many
+SELECT booking_id, user_id, event_id, booking_reference, quantity, total_amount, status, payment_status, idempotency_key, booked_at, expires_at, confirmed_at, cancelled_at, created_at, updated_at FROM bookings 
+WHERE status = 'pending'
+LIMIT $1
+`
+
+func (q *Queries) GetPendingBookings(ctx context.Context, db DBTX, limit int32) ([]Booking, error) {
+	rows, err := db.QueryContext(ctx, getPendingBookings, limit)
 	if err != nil {
 		return nil, err
 	}

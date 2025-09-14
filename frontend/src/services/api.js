@@ -65,13 +65,13 @@ const addResponseInterceptor = (apiInstance) => {
             // Retry original request
             error.config.headers.Authorization = `Bearer ${response.data.access_token}`;
             return axios.request(error.config);
-          } catch (refreshError) {
-            // Refresh failed, logout user
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-          }
+        } catch {
+          // Refresh failed, logout user
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+        }
         }
       }
       return Promise.reject(error);
@@ -116,7 +116,7 @@ adminAPI.interceptors.response.use(
           // Retry original request
           error.config.headers.Authorization = `Bearer ${response.data.access_token}`;
           return axios.request(error.config);
-        } catch (refreshError) {
+        } catch {
           // Refresh failed, logout admin
           localStorage.removeItem('admin_access_token');
           localStorage.removeItem('admin_refresh_token');
@@ -166,7 +166,7 @@ export const eventService = {
   createEvent: (eventData) => adminAPI.post('/api/v1/admin/events', eventData),
   getAdminEvents: (params = {}) => adminAPI.get('/api/v1/admin/events', { params }),
   updateEvent: (eventId, eventData) => adminAPI.put(`/api/v1/admin/events/${eventId}`, eventData),
-  deleteEvent: (eventId) => adminAPI.delete(`/api/v1/admin/events/${eventId}`),
+  deleteEvent: (eventId, version) => adminAPI.delete(`/api/v1/admin/events/${eventId}`, { data: { version } }),
   
   // Public Events
   getEvents: (params = {}) => eventAPI.get('/api/v1/events', { params }),
@@ -203,6 +203,7 @@ export const bookingService = {
   confirm: (confirmData) => bookingAPI.post('/api/v1/bookings/confirm', confirmData),
   getBooking: (bookingId) => bookingAPI.get(`/api/v1/bookings/${bookingId}`),
   cancelBooking: (bookingId) => bookingAPI.delete(`/api/v1/bookings/${bookingId}`),
+  expireReservation: (reservationId) => bookingAPI.post(`/api/v1/bookings/${reservationId}/expire`),
   getUserBookings: (userId, params = {}) => bookingAPI.get(`/api/v1/bookings/user/${userId}`, { params }),
   
   // Waitlist

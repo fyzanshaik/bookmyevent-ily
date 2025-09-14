@@ -13,7 +13,7 @@ import (
 )
 
 const getEventWaitlist = `-- name: GetEventWaitlist :many
-SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist 
+SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist
 WHERE event_id = $1 AND status = 'waiting'
 ORDER BY position ASC
 LIMIT $2
@@ -61,9 +61,9 @@ func (q *Queries) GetEventWaitlist(ctx context.Context, db DBTX, arg GetEventWai
 }
 
 const getExpiredWaitlistOffers = `-- name: GetExpiredWaitlistOffers :many
-SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist 
-WHERE status = 'offered' 
-    AND expires_at IS NOT NULL 
+SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist
+WHERE status = 'offered'
+    AND expires_at IS NOT NULL
     AND expires_at < CURRENT_TIMESTAMP
 `
 
@@ -104,7 +104,7 @@ func (q *Queries) GetExpiredWaitlistOffers(ctx context.Context, db DBTX) ([]Wait
 }
 
 const getNextWaitlistEntries = `-- name: GetNextWaitlistEntries :many
-SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist 
+SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist
 WHERE event_id = $1 AND status = 'waiting'
 ORDER BY position ASC
 LIMIT $2
@@ -152,7 +152,7 @@ func (q *Queries) GetNextWaitlistEntries(ctx context.Context, db DBTX, arg GetNe
 }
 
 const getOfferedWaitlistEntries = `-- name: GetOfferedWaitlistEntries :many
-SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist 
+SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist
 WHERE status = 'offered' AND expires_at < CURRENT_TIMESTAMP
 `
 
@@ -246,7 +246,7 @@ func (q *Queries) GetWaitlistEntry(ctx context.Context, db DBTX, waitlistID uuid
 }
 
 const getWaitlistEntryByUserAndEvent = `-- name: GetWaitlistEntryByUserAndEvent :one
-SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist 
+SELECT waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at FROM waitlist
 WHERE user_id = $1 AND event_id = $2
 `
 
@@ -276,7 +276,7 @@ func (q *Queries) GetWaitlistEntryByUserAndEvent(ctx context.Context, db DBTX, a
 }
 
 const getWaitlistPosition = `-- name: GetWaitlistPosition :one
-SELECT position, status FROM waitlist 
+SELECT position, status FROM waitlist
 WHERE user_id = $1 AND event_id = $2
 `
 
@@ -298,12 +298,12 @@ func (q *Queries) GetWaitlistPosition(ctx context.Context, db DBTX, arg GetWaitl
 }
 
 const getWaitlistStats = `-- name: GetWaitlistStats :one
-SELECT 
+SELECT
     COUNT(*) as total_waiting,
-    MIN(position) as first_position,
-    MAX(position) as last_position,
-    AVG(quantity_requested) as avg_quantity_requested
-FROM waitlist 
+    COALESCE(MIN(position), 0) as first_position,
+    COALESCE(MAX(position), 0) as last_position,
+    COALESCE(AVG(quantity_requested), 0.0) as avg_quantity_requested
+FROM waitlist
 WHERE event_id = $1 AND status = 'waiting'
 `
 
@@ -311,7 +311,7 @@ type GetWaitlistStatsRow struct {
 	TotalWaiting         int64       `json:"total_waiting"`
 	FirstPosition        interface{} `json:"first_position"`
 	LastPosition         interface{} `json:"last_position"`
-	AvgQuantityRequested float64     `json:"avg_quantity_requested"`
+	AvgQuantityRequested interface{} `json:"avg_quantity_requested"`
 }
 
 func (q *Queries) GetWaitlistStats(ctx context.Context, db DBTX, eventID uuid.UUID) (GetWaitlistStatsRow, error) {
@@ -327,11 +327,10 @@ func (q *Queries) GetWaitlistStats(ctx context.Context, db DBTX, eventID uuid.UU
 }
 
 const joinWaitlist = `-- name: JoinWaitlist :one
-
 INSERT INTO waitlist (
     event_id, user_id, quantity_requested, position
 ) VALUES (
-    $1, $2, $3, 
+    $1, $2, $3,
     COALESCE((SELECT MAX(position) FROM waitlist WHERE event_id = $1 AND status = 'waiting'), 0) + 1
 ) RETURNING waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at
 `
@@ -342,7 +341,6 @@ type JoinWaitlistParams struct {
 	QuantityRequested int32     `json:"quantity_requested"`
 }
 
-// Waitlist operations
 func (q *Queries) JoinWaitlist(ctx context.Context, db DBTX, arg JoinWaitlistParams) (Waitlist, error) {
 	row := db.QueryRowContext(ctx, joinWaitlist, arg.EventID, arg.UserID, arg.QuantityRequested)
 	var i Waitlist
@@ -363,6 +361,22 @@ func (q *Queries) JoinWaitlist(ctx context.Context, db DBTX, arg JoinWaitlistPar
 	return i, err
 }
 
+const reassignWaitlistPosition = `-- name: ReassignWaitlistPosition :exec
+UPDATE waitlist
+SET position = $2, updated_at = CURRENT_TIMESTAMP
+WHERE waitlist_id = $1
+`
+
+type ReassignWaitlistPositionParams struct {
+	WaitlistID uuid.UUID `json:"waitlist_id"`
+	Position   int32     `json:"position"`
+}
+
+func (q *Queries) ReassignWaitlistPosition(ctx context.Context, db DBTX, arg ReassignWaitlistPositionParams) error {
+	_, err := db.ExecContext(ctx, reassignWaitlistPosition, arg.WaitlistID, arg.Position)
+	return err
+}
+
 const removeFromWaitlist = `-- name: RemoveFromWaitlist :exec
 DELETE FROM waitlist WHERE user_id = $1 AND event_id = $2
 `
@@ -378,7 +392,7 @@ func (q *Queries) RemoveFromWaitlist(ctx context.Context, db DBTX, arg RemoveFro
 }
 
 const reorderWaitlistAfterRemoval = `-- name: ReorderWaitlistAfterRemoval :exec
-UPDATE waitlist 
+UPDATE waitlist
 SET position = position - 1, updated_at = CURRENT_TIMESTAMP
 WHERE event_id = $1 AND position > $2 AND status = 'waiting'
 `
@@ -393,13 +407,78 @@ func (q *Queries) ReorderWaitlistAfterRemoval(ctx context.Context, db DBTX, arg 
 	return err
 }
 
+const setWaitlistOffered = `-- name: SetWaitlistOffered :one
+UPDATE waitlist
+SET status = 'offered', 
+    offered_at = CURRENT_TIMESTAMP,
+    expires_at = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE waitlist_id = $1
+RETURNING waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at
+`
+
+type SetWaitlistOfferedParams struct {
+	WaitlistID uuid.UUID    `json:"waitlist_id"`
+	ExpiresAt  sql.NullTime `json:"expires_at"`
+}
+
+func (q *Queries) SetWaitlistOffered(ctx context.Context, db DBTX, arg SetWaitlistOfferedParams) (Waitlist, error) {
+	row := db.QueryRowContext(ctx, setWaitlistOffered, arg.WaitlistID, arg.ExpiresAt)
+	var i Waitlist
+	err := row.Scan(
+		&i.WaitlistID,
+		&i.EventID,
+		&i.UserID,
+		&i.Position,
+		&i.QuantityRequested,
+		&i.Status,
+		&i.JoinedAt,
+		&i.OfferedAt,
+		&i.ExpiresAt,
+		&i.ConvertedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const setWaitlistWaiting = `-- name: SetWaitlistWaiting :one
+UPDATE waitlist
+SET status = 'waiting',
+    expires_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE waitlist_id = $1
+RETURNING waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at
+`
+
+func (q *Queries) SetWaitlistWaiting(ctx context.Context, db DBTX, waitlistID uuid.UUID) (Waitlist, error) {
+	row := db.QueryRowContext(ctx, setWaitlistWaiting, waitlistID)
+	var i Waitlist
+	err := row.Scan(
+		&i.WaitlistID,
+		&i.EventID,
+		&i.UserID,
+		&i.Position,
+		&i.QuantityRequested,
+		&i.Status,
+		&i.JoinedAt,
+		&i.OfferedAt,
+		&i.ExpiresAt,
+		&i.ConvertedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateWaitlistStatus = `-- name: UpdateWaitlistStatus :one
-UPDATE waitlist 
-SET status = $2, updated_at = CURRENT_TIMESTAMP,
-    offered_at = CASE WHEN $2 = 'offered' THEN CURRENT_TIMESTAMP ELSE offered_at END,
-    converted_at = CASE WHEN $2 = 'converted' THEN CURRENT_TIMESTAMP ELSE converted_at END,
+UPDATE waitlist
+SET status = COALESCE($2, status),
+    updated_at = CURRENT_TIMESTAMP,
+    offered_at = CASE WHEN $2::text = 'offered' THEN CURRENT_TIMESTAMP ELSE offered_at END,
+    converted_at = CASE WHEN $2::text = 'converted' THEN CURRENT_TIMESTAMP ELSE converted_at END,
     expires_at = $3
-WHERE waitlist_id = $1 
+WHERE waitlist_id = $1
 RETURNING waitlist_id, event_id, user_id, position, quantity_requested, status, joined_at, offered_at, expires_at, converted_at, created_at, updated_at
 `
 

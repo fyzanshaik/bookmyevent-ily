@@ -103,10 +103,13 @@ type JoinWaitlistResponse struct {
 }
 
 type WaitlistPositionResponse struct {
-	Position      int32  `json:"position"`
-	TotalWaiting  int32  `json:"total_waiting"`
-	Status        string `json:"status"`
-	EstimatedWait string `json:"estimated_wait"`
+	Position          int32      `json:"position"`
+	TotalWaiting      int32      `json:"total_waiting"`
+	Status            string     `json:"status"`
+	EstimatedWait     string     `json:"estimated_wait"`
+	QuantityRequested int32      `json:"quantity_requested"`
+	OfferedAt         *time.Time `json:"offered_at,omitempty"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
 }
 
 type LeaveWaitlistRequest struct {

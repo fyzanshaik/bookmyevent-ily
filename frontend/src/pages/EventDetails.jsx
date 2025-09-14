@@ -105,6 +105,7 @@ const EventDetails = () => {
 
     const totalPrice = (availability?.base_price || event.base_price) * quantity;
     const isAvailable = availability?.available && availability.available_seats >= quantity;
+    const isSoldOut = event.status === 'sold_out' || event.available_seats === 0 || (availability && !availability.available);
 
     return (
         <div className="max-w-4xl mx-auto space-y-8">
@@ -240,7 +241,7 @@ const EventDetails = () => {
                             ) : (
                                 <div className="flex items-center text-red-600">
                                     <AlertCircle className="h-4 w-4 mr-2" />
-                                    Unable to check availability
+                                    Fully booked
                                 </div>
                             )}
                         </div>
@@ -258,8 +259,8 @@ const EventDetails = () => {
                         </div>
 
                         {/* Book Button */}
-                        {event.status === 'published' ? (
-                            isAvailable ? (
+                        {event.status === 'published' || event.status === 'sold_out' ? (
+                            isAvailable && !isSoldOut ? (
                                 <button
                                     onClick={handleBookNow}
                                     disabled={availabilityLoading}
@@ -273,7 +274,7 @@ const EventDetails = () => {
                                         disabled
                                         className="w-full bg-gray-400 text-white py-3 px-4 rounded-lg font-semibold cursor-not-allowed"
                                     >
-                                        Not Available
+                                        {isSoldOut ? 'Sold Out' : 'Not Available'}
                                     </button>
                                     {isAuthenticated && (
                                         <Link
@@ -281,6 +282,15 @@ const EventDetails = () => {
                                             className="w-full bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-700 transition-colors font-semibold text-center block"
                                         >
                                             Join Waitlist
+                                        </Link>
+                                    )}
+                                    {!isAuthenticated && (
+                                        <Link
+                                            to="/login"
+                                            state={{ from: { pathname: `/waitlist/${eventId}` } }}
+                                            className="w-full bg-yellow-600 text-white py-2 px-4 rounded-lg hover:bg-yellow-700 transition-colors font-semibold text-center block"
+                                        >
+                                            Login to Join Waitlist
                                         </Link>
                                     )}
                                 </div>

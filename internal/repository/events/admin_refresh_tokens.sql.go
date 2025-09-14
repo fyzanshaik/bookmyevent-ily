@@ -17,7 +17,7 @@ DELETE FROM admin_refresh_tokens
 WHERE expires_at < CURRENT_TIMESTAMP OR revoked_at IS NOT NULL
 `
 
-// CLEANUP EXPIRED ADMIN TOKENS (maintenance)
+// CleanupExpiredAdminTokens
 //
 //	DELETE FROM admin_refresh_tokens
 //	WHERE expires_at < CURRENT_TIMESTAMP OR revoked_at IS NOT NULL
@@ -27,7 +27,6 @@ func (q *Queries) CleanupExpiredAdminTokens(ctx context.Context) error {
 }
 
 const createAdminRefreshToken = `-- name: CreateAdminRefreshToken :one
-
 INSERT INTO admin_refresh_tokens (
     token, admin_id, expires_at
 ) VALUES (
@@ -41,8 +40,7 @@ type CreateAdminRefreshTokenParams struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// Admin Refresh Token Management Queries
-// CREATE ADMIN REFRESH TOKEN
+// CreateAdminRefreshToken
 //
 //	INSERT INTO admin_refresh_tokens (
 //	    token, admin_id, expires_at
@@ -68,7 +66,7 @@ SELECT token, admin_id, expires_at, revoked_at, created_at, updated_at FROM admi
 WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
 `
 
-// GET ADMIN REFRESH TOKEN (for validation)
+// GetAdminRefreshToken
 //
 //	SELECT token, admin_id, expires_at, revoked_at, created_at, updated_at FROM admin_refresh_tokens
 //	WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
@@ -88,13 +86,13 @@ func (q *Queries) GetAdminRefreshToken(ctx context.Context, token string) (Admin
 
 const revokeAdminRefreshToken = `-- name: RevokeAdminRefreshToken :exec
 UPDATE admin_refresh_tokens
-SET 
+SET
     revoked_at = CURRENT_TIMESTAMP,
     updated_at = CURRENT_TIMESTAMP
 WHERE token = $1
 `
 
-// REVOKE ADMIN REFRESH TOKEN (logout)
+// RevokeAdminRefreshToken
 //
 //	UPDATE admin_refresh_tokens
 //	SET
@@ -108,13 +106,13 @@ func (q *Queries) RevokeAdminRefreshToken(ctx context.Context, token string) err
 
 const revokeAllAdminTokens = `-- name: RevokeAllAdminTokens :exec
 UPDATE admin_refresh_tokens
-SET 
+SET
     revoked_at = CURRENT_TIMESTAMP,
     updated_at = CURRENT_TIMESTAMP
 WHERE admin_id = $1 AND revoked_at IS NULL
 `
 
-// REVOKE ALL ADMIN TOKENS (security action)
+// RevokeAllAdminTokens
 //
 //	UPDATE admin_refresh_tokens
 //	SET

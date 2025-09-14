@@ -400,6 +400,8 @@ func (cfg *APIConfig) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			if err := cfg.SearchClient.DeleteEvent(r.Context(), eventID); err != nil {
 				cfg.Logger.Error("Failed to delete event from search service", "error", err, "event_id", eventID)
+			} else {
+				cfg.Logger.Info("Event removed from search service", "event_id", eventID)
 			}
 		}()
 	}

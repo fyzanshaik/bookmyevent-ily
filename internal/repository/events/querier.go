@@ -12,28 +12,28 @@ import (
 )
 
 type Querier interface {
-	// CHECK ADMIN PERMISSIONS
+	//CheckAdminPermissions
 	//
 	//  SELECT admin_id, role, permissions, is_active
 	//  FROM admins
 	//  WHERE admin_id = $1 AND is_active = true
 	CheckAdminPermissions(ctx context.Context, adminID uuid.UUID) (CheckAdminPermissionsRow, error)
-	// Check if event exists and is modifiable
+	//CheckEventOwnership
 	//
 	//  SELECT event_id, created_by, status, version
 	//  FROM events
 	//  WHERE event_id = $1 AND created_by = $2
 	CheckEventOwnership(ctx context.Context, arg CheckEventOwnershipParams) (CheckEventOwnershipRow, error)
-	// CLEANUP EXPIRED ADMIN TOKENS (maintenance)
+	//CleanupExpiredAdminTokens
 	//
 	//  DELETE FROM admin_refresh_tokens
 	//  WHERE expires_at < CURRENT_TIMESTAMP OR revoked_at IS NOT NULL
 	CleanupExpiredAdminTokens(ctx context.Context) error
-	// COUNT ADMINS
+	//CountAdmins
 	//
 	//  SELECT COUNT(*) FROM admins
 	CountAdmins(ctx context.Context) (int64, error)
-	// COUNT PUBLISHED EVENTS (for pagination)
+	//CountPublishedEvents
 	//
 	//  SELECT COUNT(*)
 	//  FROM events e
@@ -45,15 +45,13 @@ type Querier interface {
 	//    AND ($3::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $3)
 	//    AND ($4::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $4)
 	CountPublishedEvents(ctx context.Context, arg CountPublishedEventsParams) (int64, error)
-	// COUNT VENUES (for pagination)
+	//CountVenues
 	//
 	//  SELECT COUNT(*) FROM venues
 	//  WHERE ($1::text IS NULL OR city ILIKE '%' || $1 || '%')
 	//    AND ($2::text IS NULL OR state ILIKE '%' || $2 || '%')
 	CountVenues(ctx context.Context, arg CountVenuesParams) (int64, error)
-	// Admin Management Queries
 	// CREATE ADMIN
-	//
 	//
 	//  INSERT INTO admins (
 	//      email, name, phone_number, password_hash, role, permissions
@@ -62,9 +60,7 @@ type Querier interface {
 	//  )
 	//  RETURNING admin_id, email, name, phone_number, role, permissions, is_active, created_at
 	CreateAdmin(ctx context.Context, arg CreateAdminParams) (CreateAdminRow, error)
-	// Admin Refresh Token Management Queries
-	// CREATE ADMIN REFRESH TOKEN
-	//
+	//CreateAdminRefreshToken
 	//
 	//  INSERT INTO admin_refresh_tokens (
 	//      token, admin_id, expires_at
@@ -72,9 +68,7 @@ type Querier interface {
 	//      $1, $2, $3
 	//  ) RETURNING token, admin_id, expires_at, revoked_at, created_at, updated_at
 	CreateAdminRefreshToken(ctx context.Context, arg CreateAdminRefreshTokenParams) (AdminRefreshToken, error)
-	// Event Management Queries with Concurrency Control
-	// CREATE EVENT
-	//
+	//CreateEvent
 	//
 	//  INSERT INTO events (
 	//      name, description, venue_id, event_type, start_datetime, end_datetime,
@@ -85,9 +79,7 @@ type Querier interface {
 	//  )
 	//  RETURNING event_id, name, description, venue_id, event_type, start_datetime, end_datetime, total_capacity, available_seats, base_price, max_tickets_per_booking, status, version, created_by, created_at, updated_at
 	CreateEvent(ctx context.Context, arg CreateEventParams) (Event, error)
-	// Venue Management Queries
-	// CREATE VENUE
-	//
+	//CreateVenue
 	//
 	//  INSERT INTO venues (
 	//      name, address, city, state, country, postal_code, capacity, layout_config
@@ -96,13 +88,13 @@ type Querier interface {
 	//  )
 	//  RETURNING venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at
 	CreateVenue(ctx context.Context, arg CreateVenueParams) (Venue, error)
-	// DEACTIVATE ADMIN
+	//DeactivateAdmin
 	//
 	//  UPDATE admins
 	//  SET is_active = false, updated_at = CURRENT_TIMESTAMP
 	//  WHERE admin_id = $1
 	DeactivateAdmin(ctx context.Context, adminID uuid.UUID) error
-	// DELETE EVENT (Admin)
+	//DeleteEvent
 	//
 	//  UPDATE events
 	//  SET status = 'cancelled',
@@ -111,27 +103,27 @@ type Querier interface {
 	//  WHERE event_id = $1
 	//    AND version = $2
 	DeleteEvent(ctx context.Context, arg DeleteEventParams) error
-	// DELETE VENUE
+	//DeleteVenue
 	//
 	//  DELETE FROM venues WHERE venue_id = $1
 	DeleteVenue(ctx context.Context, venueID uuid.UUID) error
-	// GET ADMIN BY EMAIL (for login)
+	//GetAdminByEmail
 	//
 	//  SELECT admin_id, email, name, phone_number, password_hash, role, permissions, is_active, created_at, updated_at FROM admins
 	//  WHERE email = $1 AND is_active = true
 	GetAdminByEmail(ctx context.Context, email string) (Admin, error)
-	// GET ADMIN BY ID
+	//GetAdminByID
 	//
 	//  SELECT admin_id, email, name, phone_number, role, permissions, is_active, created_at, updated_at
 	//  FROM admins
 	//  WHERE admin_id = $1
 	GetAdminByID(ctx context.Context, adminID uuid.UUID) (GetAdminByIDRow, error)
-	// GET ADMIN REFRESH TOKEN (for validation)
+	//GetAdminRefreshToken
 	//
 	//  SELECT token, admin_id, expires_at, revoked_at, created_at, updated_at FROM admin_refresh_tokens
 	//  WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
 	GetAdminRefreshToken(ctx context.Context, token string) (AdminRefreshToken, error)
-	// GET EVENT ANALYTICS (Admin)
+	//GetEventAnalytics
 	//
 	//  SELECT
 	//      e.event_id,
@@ -145,41 +137,40 @@ type Querier interface {
 	//  FROM events e
 	//  WHERE e.event_id = $1
 	GetEventAnalytics(ctx context.Context, eventID uuid.UUID) (GetEventAnalyticsRow, error)
-	// GET EVENT BY ID
+	//GetEventByID
 	//
 	//  SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.address, v.city, v.state, v.country
 	//  FROM events e
 	//  JOIN venues v ON e.venue_id = v.venue_id
 	//  WHERE e.event_id = $1
 	GetEventByID(ctx context.Context, eventID uuid.UUID) (GetEventByIDRow, error)
-	// CRITICAL: Get Event for Booking (with row-level lock)
+	//GetEventForBooking
 	//
 	//  SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
 	//         status, version, base_price, name
 	//  FROM events
 	//  WHERE event_id = $1
-	//    AND status = 'published'
-	//    AND available_seats > 0
+	//    AND (status = 'published' OR status = 'sold_out')
 	//  FOR UPDATE
 	GetEventForBooking(ctx context.Context, eventID uuid.UUID) (GetEventForBookingRow, error)
-	// GET VENUE BY ID
+	//GetVenueByID
 	//
 	//  SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues WHERE venue_id = $1
 	GetVenueByID(ctx context.Context, venueID uuid.UUID) (Venue, error)
-	// GET VENUES BY CITY (for event creation dropdown)
+	//GetVenuesByCity
 	//
 	//  SELECT venue_id, name, capacity, address FROM venues
 	//  WHERE city = $1
 	//  ORDER BY name
 	GetVenuesByCity(ctx context.Context, city string) ([]GetVenuesByCityRow, error)
-	// LIST ADMINS (Super Admin only)
+	//ListAdmins
 	//
 	//  SELECT admin_id, email, name, phone_number, role, is_active, created_at
 	//  FROM admins
 	//  ORDER BY created_at DESC
 	//  LIMIT $1 OFFSET $2
 	ListAdmins(ctx context.Context, arg ListAdminsParams) ([]ListAdminsRow, error)
-	// LIST EVENTS BY ADMIN
+	//ListEventsByAdmin
 	//
 	//  SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.city
 	//  FROM events e
@@ -188,7 +179,7 @@ type Querier interface {
 	//  ORDER BY e.created_at DESC
 	//  LIMIT $1 OFFSET $2
 	ListEventsByAdmin(ctx context.Context, arg ListEventsByAdminParams) ([]ListEventsByAdminRow, error)
-	// LIST PUBLISHED EVENTS (Public API - High Traffic)
+	//ListPublishedEvents
 	//
 	//  SELECT e.event_id, e.name, e.description, e.venue_id, e.event_type, e.start_datetime, e.end_datetime, e.total_capacity, e.available_seats, e.base_price, e.max_tickets_per_booking, e.status, e.version, e.created_by, e.created_at, e.updated_at, v.name as venue_name, v.city, v.state
 	//  FROM events e
@@ -202,7 +193,7 @@ type Querier interface {
 	//  ORDER BY e.start_datetime ASC
 	//  LIMIT $1 OFFSET $2
 	ListPublishedEvents(ctx context.Context, arg ListPublishedEventsParams) ([]ListPublishedEventsRow, error)
-	// LIST VENUES
+	//ListVenues
 	//
 	//  SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues
 	//  WHERE ($3::text IS NULL OR city ILIKE '%' || $3 || '%')
@@ -210,7 +201,7 @@ type Querier interface {
 	//  ORDER BY name
 	//  LIMIT $1 OFFSET $2
 	ListVenues(ctx context.Context, arg ListVenuesParams) ([]Venue, error)
-	// CRITICAL: Return Seats (for cancellations)
+	//ReturnEventSeats
 	//
 	//  UPDATE events
 	//  SET available_seats = available_seats + $2,
@@ -224,7 +215,7 @@ type Querier interface {
 	//    AND version = $3
 	//  RETURNING event_id, available_seats, status, version
 	ReturnEventSeats(ctx context.Context, arg ReturnEventSeatsParams) (ReturnEventSeatsRow, error)
-	// REVOKE ADMIN REFRESH TOKEN (logout)
+	//RevokeAdminRefreshToken
 	//
 	//  UPDATE admin_refresh_tokens
 	//  SET
@@ -232,7 +223,7 @@ type Querier interface {
 	//      updated_at = CURRENT_TIMESTAMP
 	//  WHERE token = $1
 	RevokeAdminRefreshToken(ctx context.Context, token string) error
-	// REVOKE ALL ADMIN TOKENS (security action)
+	//RevokeAllAdminTokens
 	//
 	//  UPDATE admin_refresh_tokens
 	//  SET
@@ -240,7 +231,7 @@ type Querier interface {
 	//      updated_at = CURRENT_TIMESTAMP
 	//  WHERE admin_id = $1 AND revoked_at IS NULL
 	RevokeAllAdminTokens(ctx context.Context, adminID uuid.UUID) error
-	// SEARCH VENUES
+	//SearchVenues
 	//
 	//  SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues
 	//  WHERE name ILIKE '%' || $1 || '%'
@@ -251,7 +242,7 @@ type Querier interface {
 	//      name
 	//  LIMIT 10
 	SearchVenues(ctx context.Context, dollar_1 sql.NullString) ([]Venue, error)
-	// UPDATE ADMIN PERMISSIONS (Super Admin only)
+	//UpdateAdminPermissions
 	//
 	//  UPDATE admins
 	//  SET role = COALESCE($2, role),
@@ -261,7 +252,7 @@ type Querier interface {
 	//  WHERE admin_id = $1
 	//  RETURNING admin_id, email, name, phone_number, role, permissions, is_active, created_at, updated_at
 	UpdateAdminPermissions(ctx context.Context, arg UpdateAdminPermissionsParams) (UpdateAdminPermissionsRow, error)
-	// UPDATE ADMIN PROFILE
+	//UpdateAdminProfile
 	//
 	//  UPDATE admins
 	//  SET name = COALESCE($2, name),
@@ -270,7 +261,7 @@ type Querier interface {
 	//  WHERE admin_id = $1 AND is_active = true
 	//  RETURNING admin_id, email, name, phone_number, role, permissions, is_active, created_at, updated_at
 	UpdateAdminProfile(ctx context.Context, arg UpdateAdminProfileParams) (UpdateAdminProfileRow, error)
-	// UPDATE EVENT (Admin)
+	//UpdateEvent
 	//
 	//  UPDATE events
 	//  SET name = COALESCE($2, name),
@@ -290,7 +281,7 @@ type Querier interface {
 	//    AND version = $13
 	//  RETURNING event_id, name, description, venue_id, event_type, start_datetime, end_datetime, total_capacity, available_seats, base_price, max_tickets_per_booking, status, version, created_by, created_at, updated_at
 	UpdateEvent(ctx context.Context, arg UpdateEventParams) (Event, error)
-	// CRITICAL: Update Available Seats with Optimistic Locking
+	//UpdateEventAvailability
 	//
 	//  UPDATE events
 	//  SET available_seats = available_seats - $2,
@@ -305,7 +296,7 @@ type Querier interface {
 	//    AND available_seats >= $2
 	//  RETURNING event_id, available_seats, status, version
 	UpdateEventAvailability(ctx context.Context, arg UpdateEventAvailabilityParams) (UpdateEventAvailabilityRow, error)
-	// UPDATE VENUE
+	//UpdateVenue
 	//
 	//  UPDATE venues
 	//  SET name = COALESCE($2, name),

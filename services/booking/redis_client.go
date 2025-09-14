@@ -148,6 +148,11 @@ func (r *RedisClient) GetCachedEventAvailability(ctx context.Context, eventID uu
 	return int32(seats), nil
 }
 
+func (r *RedisClient) InvalidateEventAvailabilityCache(ctx context.Context, eventID uuid.UUID) error {
+	key := fmt.Sprintf("booking:event_availability:%s", eventID)
+	return r.client.Del(ctx, key).Err()
+}
+
 func (r *RedisClient) Close() error {
 	return r.client.Close()
 }

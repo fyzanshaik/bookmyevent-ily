@@ -13,7 +13,6 @@ import (
 )
 
 const createBookingSeat = `-- name: CreateBookingSeat :one
-
 INSERT INTO booking_seats (
     booking_id, seat_number, seat_row, seat_section, status
 ) VALUES (
@@ -29,7 +28,6 @@ type CreateBookingSeatParams struct {
 	Status      sql.NullString `json:"status"`
 }
 
-// Booking seats operations (future feature)
 func (q *Queries) CreateBookingSeat(ctx context.Context, db DBTX, arg CreateBookingSeatParams) (BookingSeat, error) {
 	row := db.QueryRowContext(ctx, createBookingSeat,
 		arg.BookingID,

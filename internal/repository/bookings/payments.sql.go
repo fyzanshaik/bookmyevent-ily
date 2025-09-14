@@ -13,7 +13,6 @@ import (
 )
 
 const createPayment = `-- name: CreatePayment :one
-
 INSERT INTO payments (
     booking_id, user_id, event_id, amount, currency, 
     payment_method, payment_gateway, gateway_transaction_id, status
@@ -34,7 +33,6 @@ type CreatePaymentParams struct {
 	Status               string         `json:"status"`
 }
 
-// Payment operations
 func (q *Queries) CreatePayment(ctx context.Context, db DBTX, arg CreatePaymentParams) (Payment, error) {
 	row := db.QueryRowContext(ctx, createPayment,
 		arg.BookingID,

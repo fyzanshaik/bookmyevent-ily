@@ -199,7 +199,19 @@ func (cfg *APIConfig) ReserveSeats(w http.ResponseWriter, r *http.Request) {
 
 	totalAmount := event.BasePrice * float64(req.Quantity)
 	bookingRef := utils.GenerateBookingReference()
-	expiresAt := time.Now().Add(cfg.Config.ReservationExpiry)
+
+	var expiresAt time.Time
+	var reservationExpiry time.Duration
+
+	if isWaitlistUser {
+		cfg.Logger.Info("Waitlist user booking reservation", "user_id", userID, "event_id", req.EventID)
+		expiresAt = userWaitlistEntry.ExpiresAt.Time
+		reservationExpiry = time.Until(expiresAt)
+	} else {
+		cfg.Logger.Info("Regular user booking reservation", "user_id", userID, "event_id", req.EventID)
+		expiresAt = time.Now().Add(cfg.Config.ReservationExpiry)
+		reservationExpiry = cfg.Config.ReservationExpiry
+	}
 
 	booking, err := cfg.DB.CreateBooking(r.Context(), cfg.DB_Conn, bookings.CreateBookingParams{
 		UserID:           userID,
@@ -229,7 +241,7 @@ func (cfg *APIConfig) ReserveSeats(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt:        expiresAt,
 	}
 
-	if err := cfg.RedisClient.SetReservation(r.Context(), booking.BookingID, reservationData, cfg.Config.ReservationExpiry); err != nil {
+	if err := cfg.RedisClient.SetReservation(r.Context(), booking.BookingID, reservationData, reservationExpiry); err != nil {
 		cfg.Logger.Error("Failed to store reservation in Redis", "error", err, "booking_id", booking.BookingID)
 	}
 
@@ -339,6 +351,7 @@ func (cfg *APIConfig) ConfirmBooking(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg.RedisClient.DeleteReservation(r.Context(), req.ReservationID)
+	cfg.RedisClient.InvalidateEventAvailabilityCache(r.Context(), booking.EventID)
 
 	userWaitlistEntry, err := cfg.DB.GetWaitlistEntryByUserAndEvent(r.Context(), cfg.DB_Conn, bookings.GetWaitlistEntryByUserAndEventParams{
 		UserID:  userID,
@@ -504,6 +517,9 @@ func (cfg *APIConfig) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	if refundAmount > 0 {
 		refundStatus = "processed"
 	}
+
+	cfg.RedisClient.DeleteReservation(r.Context(), bookingID)
+	cfg.RedisClient.InvalidateEventAvailabilityCache(r.Context(), booking.EventID)
 
 	cfg.Logger.Info("Booking cancelled",
 		"booking_id", bookingID,
@@ -690,10 +706,20 @@ func (cfg *APIConfig) GetWaitlistPosition(w http.ResponseWriter, r *http.Request
 	}
 
 	response := WaitlistPositionResponse{
-		Position:      waitlistEntry.Position,
-		TotalWaiting:  int32(stats.TotalWaiting),
-		Status:        waitlistEntry.Status.String,
-		EstimatedWait: cfg.calculateEstimatedWait(waitlistEntry.Position),
+		Position:          waitlistEntry.Position,
+		TotalWaiting:      int32(stats.TotalWaiting),
+		Status:            waitlistEntry.Status.String,
+		EstimatedWait:     cfg.calculateEstimatedWait(waitlistEntry.Position),
+		QuantityRequested: waitlistEntry.QuantityRequested,
+	}
+
+	if waitlistEntry.Status.String == "offered" {
+		if waitlistEntry.ExpiresAt.Valid {
+			response.ExpiresAt = &waitlistEntry.ExpiresAt.Time
+		}
+		if waitlistEntry.OfferedAt.Valid {
+			response.OfferedAt = &waitlistEntry.OfferedAt.Time
+		}
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
@@ -820,6 +846,7 @@ func (cfg *APIConfig) ExpireReservations(w http.ResponseWriter, r *http.Request)
 		}
 
 		cfg.RedisClient.DeleteReservation(r.Context(), booking.BookingID)
+		cfg.RedisClient.InvalidateEventAvailabilityCache(r.Context(), booking.EventID)
 		processed++
 
 		cfg.Logger.Info("Expired booking processed",
@@ -838,6 +865,128 @@ func (cfg *APIConfig) ExpireReservations(w http.ResponseWriter, r *http.Request)
 	cfg.ExpireWaitlistOffers(r.Context())
 
 	cfg.Logger.Info("Reservation expiry job completed", "processed", processed, "total", len(expiredBookings))
+	utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *APIConfig) ForceExpireAll(w http.ResponseWriter, r *http.Request) {
+	allPendingBookings, err := cfg.DB.GetPendingBookings(r.Context(), cfg.DB_Conn, 1000)
+	if err != nil {
+		cfg.Logger.Error("Failed to get pending bookings for force expiry", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to get pending bookings")
+		return
+	}
+
+	processed := 0
+	for _, booking := range allPendingBookings {
+		_, err := cfg.DB.UpdateBookingStatus(r.Context(), cfg.DB_Conn, bookings.UpdateBookingStatusParams{
+			BookingID: booking.BookingID,
+			Status:    "expired",
+		})
+		if err != nil {
+			cfg.Logger.Error("Failed to force expire booking", "error", err, "booking_id", booking.BookingID)
+			continue
+		}
+
+		event, err := cfg.EventServiceClient.GetEventForBooking(r.Context(), booking.EventID)
+		if err != nil {
+			cfg.Logger.Error("Failed to get event for seat return in force expiry", "error", err, "event_id", booking.EventID)
+		} else {
+			_, err = cfg.EventServiceClient.ReturnSeats(r.Context(), booking.EventID, booking.Quantity, event.Version)
+			if err != nil {
+				cfg.Logger.Error("Failed to return seats in force expiry", "error", err, "booking_id", booking.BookingID, "event_id", booking.EventID)
+			}
+		}
+
+		cfg.RedisClient.DeleteReservation(r.Context(), booking.BookingID)
+		cfg.RedisClient.InvalidateEventAvailabilityCache(r.Context(), booking.EventID)
+		processed++
+
+		cfg.Logger.Info("Force expired booking",
+			"booking_id", booking.BookingID,
+			"event_id", booking.EventID,
+			"quantity", booking.Quantity)
+
+		cfg.ProcessWaitlist(r.Context(), booking.EventID, booking.Quantity)
+	}
+
+	response := map[string]any{
+		"message":   "Force expired all pending reservations",
+		"processed": processed,
+		"total":     len(allPendingBookings),
+	}
+
+	cfg.ExpireWaitlistOffers(r.Context())
+
+	cfg.Logger.Info("Force expiry job completed", "processed", processed, "total", len(allPendingBookings))
+	utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *APIConfig) ManualExpireReservation(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		utils.RespondWithError(w, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	bookingIDStr := r.PathValue("id")
+	bookingID, err := uuid.Parse(bookingIDStr)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid booking ID format")
+		return
+	}
+
+	booking, err := cfg.DB.GetBookingByID(r.Context(), cfg.DB_Conn, bookingID)
+	if err != nil {
+		cfg.Logger.Error("Failed to get booking for manual expiry", "error", err, "booking_id", bookingID)
+		utils.RespondWithError(w, http.StatusNotFound, "Booking not found")
+		return
+	}
+
+	if booking.UserID != userID {
+		utils.RespondWithError(w, http.StatusForbidden, "Access denied")
+		return
+	}
+
+	if booking.Status != "pending" {
+		utils.RespondWithError(w, http.StatusConflict, "Only pending bookings can be manually expired")
+		return
+	}
+
+	_, err = cfg.DB.UpdateBookingStatus(r.Context(), cfg.DB_Conn, bookings.UpdateBookingStatusParams{
+		BookingID: bookingID,
+		Status:    "expired",
+	})
+	if err != nil {
+		cfg.Logger.Error("Failed to expire booking manually", "error", err, "booking_id", bookingID)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to expire booking")
+		return
+	}
+
+	event, err := cfg.EventServiceClient.GetEventForBooking(r.Context(), booking.EventID)
+	if err != nil {
+		cfg.Logger.Error("Failed to get event for manual seat return", "error", err, "event_id", booking.EventID)
+	} else {
+		_, err = cfg.EventServiceClient.ReturnSeats(r.Context(), booking.EventID, booking.Quantity, event.Version)
+		if err != nil {
+			cfg.Logger.Error("Failed to return seats manually", "error", err, "booking_id", bookingID, "event_id", booking.EventID)
+		}
+	}
+
+	cfg.RedisClient.DeleteReservation(r.Context(), bookingID)
+	cfg.RedisClient.InvalidateEventAvailabilityCache(r.Context(), booking.EventID)
+
+	cfg.ProcessWaitlist(r.Context(), booking.EventID, booking.Quantity)
+
+	cfg.Logger.Info("Booking manually expired",
+		"booking_id", bookingID,
+		"user_id", userID,
+		"event_id", booking.EventID,
+		"quantity", booking.Quantity)
+
+	response := map[string]string{
+		"message": "Reservation expired successfully",
+	}
+
 	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
@@ -877,16 +1026,23 @@ func (cfg *APIConfig) ProcessWaitlist(ctx context.Context, eventID uuid.UUID, av
 		}
 
 		if entry.QuantityRequested <= seatsToOffer || seatsToOffer == availableSeats {
-			expiresAt := time.Now().Add(5 * time.Minute)
+			expiresAt := time.Now().Add(2 * time.Minute)
 
-			_, err := cfg.DB.UpdateWaitlistStatus(ctx, cfg.DB_Conn, bookings.UpdateWaitlistStatusParams{
+			_, err := cfg.DB.SetWaitlistOffered(ctx, cfg.DB_Conn, bookings.SetWaitlistOfferedParams{
 				WaitlistID: entry.WaitlistID,
-				Status:     sql.NullString{String: "offered", Valid: true},
 				ExpiresAt:  sql.NullTime{Time: expiresAt, Valid: true},
 			})
 			if err != nil {
 				cfg.Logger.Error("Failed to update waitlist status", "error", err, "waitlist_id", entry.WaitlistID)
 				continue
+			}
+
+			err = cfg.DB.ReorderWaitlistAfterRemoval(ctx, cfg.DB_Conn, bookings.ReorderWaitlistAfterRemovalParams{
+				EventID:  eventID,
+				Position: entry.Position,
+			})
+			if err != nil {
+				cfg.Logger.Error("Failed to reorder waitlist after offer", "error", err, "event_id", eventID, "position", entry.Position)
 			}
 
 			cfg.Logger.Info("Waitlist offer created",
@@ -908,26 +1064,46 @@ func (cfg *APIConfig) ExpireWaitlistOffers(ctx context.Context) error {
 	}
 
 	for _, offer := range expiredOffers {
-		_, err := cfg.DB.UpdateWaitlistStatus(ctx, cfg.DB_Conn, bookings.UpdateWaitlistStatusParams{
+		stats, err := cfg.DB.GetWaitlistStats(ctx, cfg.DB_Conn, offer.EventID)
+		if err != nil {
+			cfg.Logger.Error("Failed to get waitlist stats for expired offer", "error", err, "event_id", offer.EventID)
+			continue
+		}
+
+		newPosition := int32(1)
+		if stats.TotalWaiting > 0 {
+			if lastPos, ok := stats.LastPosition.(int32); ok {
+				newPosition = lastPos + 1
+			} else if lastPos, ok := stats.LastPosition.(int64); ok {
+				newPosition = int32(lastPos) + 1
+			}
+		}
+
+		err = cfg.DB.ReassignWaitlistPosition(ctx, cfg.DB_Conn, bookings.ReassignWaitlistPositionParams{
 			WaitlistID: offer.WaitlistID,
-			Status:     sql.NullString{String: "waiting", Valid: true},
-			ExpiresAt:  sql.NullTime{Valid: false},
+			Position:   newPosition,
 		})
+		if err != nil {
+			cfg.Logger.Error("Failed to reassign position for expired offer", "error", err, "waitlist_id", offer.WaitlistID)
+			continue
+		}
+
+		_, err = cfg.DB.SetWaitlistWaiting(ctx, cfg.DB_Conn, offer.WaitlistID)
 		if err != nil {
 			cfg.Logger.Error("Failed to expire waitlist offer", "error", err, "waitlist_id", offer.WaitlistID)
 			continue
 		}
 
-		cfg.Logger.Info("Waitlist offer expired",
+		cfg.Logger.Info("Waitlist offer expired - user moved to end of queue",
 			"user_id", offer.UserID,
 			"event_id", offer.EventID,
-			"position", offer.Position)
+			"old_position", offer.Position,
+			"new_position", newPosition)
 	}
 
 	return nil
 }
 
-// lmao
 func min(a, b int32) int32 {
 	if a < b {
 		return a

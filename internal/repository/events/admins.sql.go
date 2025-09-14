@@ -15,7 +15,7 @@ import (
 
 const checkAdminPermissions = `-- name: CheckAdminPermissions :one
 SELECT admin_id, role, permissions, is_active
-FROM admins 
+FROM admins
 WHERE admin_id = $1 AND is_active = true
 `
 
@@ -26,7 +26,7 @@ type CheckAdminPermissionsRow struct {
 	IsActive    sql.NullBool          `json:"is_active"`
 }
 
-// CHECK ADMIN PERMISSIONS
+// CheckAdminPermissions
 //
 //	SELECT admin_id, role, permissions, is_active
 //	FROM admins
@@ -47,7 +47,7 @@ const countAdmins = `-- name: CountAdmins :one
 SELECT COUNT(*) FROM admins
 `
 
-// COUNT ADMINS
+// CountAdmins
 //
 //	SELECT COUNT(*) FROM admins
 func (q *Queries) CountAdmins(ctx context.Context) (int64, error) {
@@ -58,7 +58,6 @@ func (q *Queries) CountAdmins(ctx context.Context) (int64, error) {
 }
 
 const createAdmin = `-- name: CreateAdmin :one
-
 INSERT INTO admins (
     email, name, phone_number, password_hash, role, permissions
 ) VALUES (
@@ -87,7 +86,6 @@ type CreateAdminRow struct {
 	CreatedAt   sql.NullTime          `json:"created_at"`
 }
 
-// Admin Management Queries
 // CREATE ADMIN
 //
 //	INSERT INTO admins (
@@ -120,12 +118,12 @@ func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) (Creat
 }
 
 const deactivateAdmin = `-- name: DeactivateAdmin :exec
-UPDATE admins 
+UPDATE admins
 SET is_active = false, updated_at = CURRENT_TIMESTAMP
 WHERE admin_id = $1
 `
 
-// DEACTIVATE ADMIN
+// DeactivateAdmin
 //
 //	UPDATE admins
 //	SET is_active = false, updated_at = CURRENT_TIMESTAMP
@@ -136,11 +134,11 @@ func (q *Queries) DeactivateAdmin(ctx context.Context, adminID uuid.UUID) error 
 }
 
 const getAdminByEmail = `-- name: GetAdminByEmail :one
-SELECT admin_id, email, name, phone_number, password_hash, role, permissions, is_active, created_at, updated_at FROM admins 
+SELECT admin_id, email, name, phone_number, password_hash, role, permissions, is_active, created_at, updated_at FROM admins
 WHERE email = $1 AND is_active = true
 `
 
-// GET ADMIN BY EMAIL (for login)
+// GetAdminByEmail
 //
 //	SELECT admin_id, email, name, phone_number, password_hash, role, permissions, is_active, created_at, updated_at FROM admins
 //	WHERE email = $1 AND is_active = true
@@ -164,7 +162,7 @@ func (q *Queries) GetAdminByEmail(ctx context.Context, email string) (Admin, err
 
 const getAdminByID = `-- name: GetAdminByID :one
 SELECT admin_id, email, name, phone_number, role, permissions, is_active, created_at, updated_at
-FROM admins 
+FROM admins
 WHERE admin_id = $1
 `
 
@@ -180,7 +178,7 @@ type GetAdminByIDRow struct {
 	UpdatedAt   sql.NullTime          `json:"updated_at"`
 }
 
-// GET ADMIN BY ID
+// GetAdminByID
 //
 //	SELECT admin_id, email, name, phone_number, role, permissions, is_active, created_at, updated_at
 //	FROM admins
@@ -224,7 +222,7 @@ type ListAdminsRow struct {
 	CreatedAt   sql.NullTime   `json:"created_at"`
 }
 
-// LIST ADMINS (Super Admin only)
+// ListAdmins
 //
 //	SELECT admin_id, email, name, phone_number, role, is_active, created_at
 //	FROM admins
@@ -262,7 +260,7 @@ func (q *Queries) ListAdmins(ctx context.Context, arg ListAdminsParams) ([]ListA
 }
 
 const updateAdminPermissions = `-- name: UpdateAdminPermissions :one
-UPDATE admins 
+UPDATE admins
 SET role = COALESCE($2, role),
     permissions = COALESCE($3, permissions),
     is_active = COALESCE($4, is_active),
@@ -290,7 +288,7 @@ type UpdateAdminPermissionsRow struct {
 	UpdatedAt   sql.NullTime          `json:"updated_at"`
 }
 
-// UPDATE ADMIN PERMISSIONS (Super Admin only)
+// UpdateAdminPermissions
 //
 //	UPDATE admins
 //	SET role = COALESCE($2, role),
@@ -322,7 +320,7 @@ func (q *Queries) UpdateAdminPermissions(ctx context.Context, arg UpdateAdminPer
 }
 
 const updateAdminProfile = `-- name: UpdateAdminProfile :one
-UPDATE admins 
+UPDATE admins
 SET name = COALESCE($2, name),
     phone_number = COALESCE($3, phone_number),
     updated_at = CURRENT_TIMESTAMP
@@ -348,7 +346,7 @@ type UpdateAdminProfileRow struct {
 	UpdatedAt   sql.NullTime          `json:"updated_at"`
 }
 
-// UPDATE ADMIN PROFILE
+// UpdateAdminProfile
 //
 //	UPDATE admins
 //	SET name = COALESCE($2, name),

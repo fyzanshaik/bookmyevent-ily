@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { bookingService, eventService, formatError } from '../services/api';
@@ -13,7 +13,7 @@ const BookingFlow = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
-    const [step, setStep] = useState(1); // 1: Reserve, 2: Payment, 3: Confirmation
+    const [step, setStep] = useState(1);
     const [event, setEvent] = useState(null);
     const [quantity, setQuantity] = useState(location.state?.quantity || 1);
     const [reservation, setReservation] = useState(null);
@@ -40,10 +40,27 @@ const BookingFlow = () => {
         fetchEvent();
     }, [eventId]);
 
+    const handleReservationExpiry = useCallback(async () => {
+        if (!reservation) return;
+
+        try {
+            await bookingService.expireReservation(reservation.reservation_id);
+            console.log('Reservation manually expired and seats returned');
+            setReservation(null); // Clear reservation to stop timer
+            setError('Reservation has been expired. Please start over.');
+        } catch (error) {
+            console.error('Manual expiry failed:', formatError(error));
+            console.log('Note: Expired reservation cleanup will be handled by background process');
+            setReservation(null); // Clear reservation anyway
+            setError('Reservation expired. Please start over.');
+        }
+    }, [reservation]);
+
     // Countdown timer for reservation
     useEffect(() => {
         if (reservation && reservation.expires_at) {
-            const interval = setInterval(() => {
+            // Check immediately if already expired (handles page refresh)
+            const checkExpiry = () => {
                 const now = new Date().getTime();
                 const expiry = new Date(reservation.expires_at).getTime();
                 const remaining = expiry - now;
@@ -51,15 +68,25 @@ const BookingFlow = () => {
                 if (remaining <= 0) {
                     setTimeLeft(0);
                     setError('Your reservation has expired. Please start over.');
-                    clearInterval(interval);
+                    handleReservationExpiry();
+                    setReservation(null); // Clear reservation to stop timer
+                    return false; // Expired
                 } else {
                     setTimeLeft(Math.floor(remaining / 1000));
+                    return true; // Still valid
                 }
-            }, 1000);
+            };
 
-            return () => clearInterval(interval);
+            // Check immediately on load
+            const isValid = checkExpiry();
+
+            if (isValid) {
+                // Only start interval if not expired
+                const interval = setInterval(checkExpiry, 1000);
+                return () => clearInterval(interval);
+            }
         }
-    }, [reservation]);
+    }, [reservation, handleReservationExpiry]);
 
     const formatTime = (seconds) => {
         const minutes = Math.floor(seconds / 60);
@@ -236,9 +263,18 @@ const BookingFlow = () => {
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold">Complete Payment</h2>
                         {timeLeft > 0 && (
-                            <div className="flex items-center text-red-600">
-                                <Clock className="h-5 w-5 mr-2" />
-                                <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center text-red-600">
+                                    <Clock className="h-5 w-5 mr-2" />
+                                    <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
+                                </div>
+                                <button
+                                    onClick={handleReservationExpiry}
+                                    className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                                    title="Force expiry for testing"
+                                >
+                                    Force Expiry
+                                </button>
                             </div>
                         )}
                     </div>

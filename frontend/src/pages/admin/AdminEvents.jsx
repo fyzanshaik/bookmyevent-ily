@@ -106,13 +106,13 @@ const AdminEvents = () => {
         setShowForm(true);
     };
 
-    const handleDelete = async (eventId) => {
+    const handleDelete = async (event) => {
         if (!window.confirm('Are you sure you want to delete this event?')) {
             return;
         }
 
         try {
-            await eventService.deleteEvent(eventId);
+            await eventService.deleteEvent(event.event_id, event.version);
             await fetchData();
         } catch (error) {
             setError(formatError(error));
@@ -457,7 +457,7 @@ const AdminEvents = () => {
                                         </button>
 
                                         <button
-                                            onClick={() => handleDelete(event.event_id)}
+                                            onClick={() => handleDelete(event)}
                                             className="text-red-600 hover:text-red-700 p-1"
                                             title="Delete event"
                                         >

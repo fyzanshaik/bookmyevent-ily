@@ -44,8 +44,7 @@ SELECT event_id, available_seats, total_capacity, max_tickets_per_booking,
        status, version, base_price, name
 FROM events
 WHERE event_id = $1
-  AND status = 'published'
-  AND available_seats > 0
+  AND (status = 'published' OR status = 'sold_out')
 FOR UPDATE;
 
 -- name: UpdateEventAvailability :one

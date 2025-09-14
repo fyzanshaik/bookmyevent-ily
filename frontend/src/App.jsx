@@ -3,13 +3,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import AuthProvider from './contexts/AuthContext';
 import Navbar from './components/layout/Navbar';
 import Home from './pages/Home';
-import UserLogin from './pages/auth/UserLogin';
+import { UserLogin } from './pages/auth/UserLogin';
 import UserRegister from './pages/auth/UserRegister';
-import AdminLogin from './pages/auth/AdminLogin';
+import { AdminLogin } from './pages/auth/AdminLogin';
 import AdminRegister from './pages/auth/AdminRegister';
 import Events from './pages/Events';
 import EventDetails from './pages/EventDetails';
 import BookingFlow from './pages/BookingFlow';
+import WaitlistPage from './pages/WaitlistPage';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminVenues from './pages/admin/AdminVenues';
@@ -29,6 +30,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/events" element={<Events />} />
               <Route path="/events/:eventId" element={<EventDetails />} />
+              <Route path="/waitlist/:eventId" element={<WaitlistPage />} />
 
               {/* User Auth Routes */}
               <Route path="/login" element={<UserLogin />} />

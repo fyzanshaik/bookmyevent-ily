@@ -220,6 +220,8 @@ func (cfg *APIConfig) IndexEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cfg.invalidateSearchCache(r.Context())
+
 	cfg.Logger.Info("Event indexed successfully", "event_id", req.Event.EventID)
 
 	response := IndexEventResponse{
@@ -243,6 +245,8 @@ func (cfg *APIConfig) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete event")
 		return
 	}
+
+	cfg.invalidateSearchCache(r.Context())
 
 	cfg.Logger.Info("Event deleted successfully", "event_id", eventID)
 
@@ -319,6 +323,8 @@ func (cfg *APIConfig) FullResync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	timeTaken := time.Since(start)
+
+	cfg.invalidateSearchCache(r.Context())
 
 	cfg.Logger.Info("Full resync completed", 
 		"events_indexed", totalIndexed,
@@ -403,4 +409,27 @@ func (cfg *APIConfig) cacheSearchResult(ctx context.Context, key string, result 
 	if err := cfg.RedisClient.Set(ctx, key, data, cfg.Config.CacheExpiry).Err(); err != nil {
 		cfg.Logger.Error("Failed to cache search result", "error", err)
 	}
+}
+
+func (cfg *APIConfig) invalidateSearchCache(ctx context.Context) {
+	pattern := "search:*"
+	
+	keys, err := cfg.RedisClient.Keys(ctx, pattern).Result()
+	if err != nil {
+		cfg.Logger.Error("Failed to get cache keys for invalidation", "error", err, "pattern", pattern)
+		return
+	}
+
+	if len(keys) == 0 {
+		cfg.Logger.Debug("No cache keys found to invalidate", "pattern", pattern)
+		return
+	}
+
+	deletedCount, err := cfg.RedisClient.Del(ctx, keys...).Result()
+	if err != nil {
+		cfg.Logger.Error("Failed to delete cache keys", "error", err, "keys_count", len(keys))
+		return
+	}
+
+	cfg.Logger.Info("Search cache invalidated", "keys_deleted", deletedCount, "pattern", pattern)
 }

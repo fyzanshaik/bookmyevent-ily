@@ -20,6 +20,7 @@ help:
 	@echo "  make docker-full-up                    - Start all infrastructure (PostgreSQL + Redis + Elasticsearch)"
 	@echo "  make docker-down                       - Stop all containers"
 	@echo "  make kill-services                     - Stop all running services"
+	@echo "  make clean-data                        - Clean all data from databases"
 	@echo "  make migrate-up SERVICE=booking        - Run migrations for service (user|event|booking)"
 	@echo "  make migrate-down SERVICE=booking      - Rollback migrations"
 	@echo "  make sqlc SERVICE=booking              - Generate SQLC for service"
@@ -27,6 +28,7 @@ help:
 	@echo "  make run SERVICE=booking-service       - Run specific service"
 	@echo "  make test                              - Run all tests"
 	@echo "  make dev-setup                         - Setup development environment"
+	@echo "  make dev-setup-full                    - Full development setup with data seeding"
 	@echo "  make booking-dev-setup                 - Setup booking service development"
 	@echo "  make redis-cli                         - Connect to Redis CLI"
 
@@ -36,11 +38,13 @@ docker-up: check-env
 	@echo "Waiting for database to be ready..."
 	@sleep 5
 
+
 docker-redis-up: check-env
 	@echo "Starting Redis..."
 	@export $$(cat .env | grep -v '^#' | xargs) && docker compose up -d redis
 	@echo "Waiting for Redis to be ready..."
 	@sleep 3
+
 
 docker-full-up: check-env
 	@echo "Starting all infrastructure (PostgreSQL + Redis + Elasticsearch)..."
@@ -48,9 +52,11 @@ docker-full-up: check-env
 	@echo "Waiting for services to be ready..."
 	@sleep 15
 
+
 docker-down:
 	@echo "Stopping all containers..."
 	@docker compose down
+
 
 docker-logs:
 	@docker compose logs -f
@@ -81,6 +87,7 @@ migrate-up: check-env
 	@echo "Running migrations for $(SERVICE)-service..."
 	@export $$(cat .env | grep -v '^#' | xargs) && goose -dir migrations/$(SERVICE)-service postgres "$${$(shell echo $(SERVICE) | tr '[:lower:]' '[:upper:]')_SERVICE_DB_URL}" up
 
+
 migrate-down: check-env
 	@if [ -z "$(SERVICE)" ]; then \
 		echo "ERROR: Please specify SERVICE=<user|event|booking>"; \
@@ -88,6 +95,7 @@ migrate-down: check-env
 	fi
 	@echo "Rolling back migration for $(SERVICE)-service..."
 	@export $$(cat .env | grep -v '^#' | xargs) && goose -dir migrations/$(SERVICE)-service postgres "$${$(shell echo $(SERVICE) | tr '[:lower:]' '[:upper:]')_SERVICE_DB_URL}" down
+
 
 migrate-status: check-env
 	@if [ -z "$(SERVICE)" ]; then \
@@ -97,6 +105,30 @@ migrate-status: check-env
 	@echo "Migration status for $(SERVICE)-service..."
 	@export $$(cat .env | grep -v '^#' | xargs) && goose -dir migrations/$(SERVICE)-service postgres "$${$(shell echo $(SERVICE) | tr '[:lower:]' '[:upper:]')_SERVICE_DB_URL}" status
 
+
+migrate-up-user:
+	@make migrate-up SERVICE=user
+
+migrate-up-event:
+	@make migrate-up SERVICE=event
+
+migrate-up-booking:
+	@make migrate-up SERVICE=booking
+
+migrate-down-user:
+	@make migrate-down SERVICE=user
+
+migrate-down-event:
+	@make migrate-down SERVICE=event
+
+migrate-down-booking:
+	@make migrate-down SERVICE=booking
+
+migrate-up-all:
+	@make migrate-up-user
+	@make migrate-up-event
+	@make migrate-up-booking
+
 # SQLC generation
 sqlc:
 	@if [ -z "$(SERVICE)" ]; then \
@@ -105,6 +137,20 @@ sqlc:
 	fi
 	@echo "Generating SQLC for $(SERVICE)-service..."
 	@sqlc generate -f sqlc/$(SERVICE)-service/sqlc.yaml
+
+sqlc-user:
+	@make sqlc SERVICE=user
+
+sqlc-event:
+	@make sqlc SERVICE=event
+
+sqlc-booking:
+	@make sqlc SERVICE=booking
+
+sqlc-all:
+	@make sqlc-user
+	@make sqlc-event
+	@make sqlc-booking
 
 build:
 	@if [ -z "$(SERVICE)" ]; then \
@@ -182,6 +228,20 @@ clean:
 	@rm -rf bin/
 	@echo "Cleaned build artifacts"
 
+# Clean all data from databases
+clean-data: check-env
+	@echo "Cleaning all data from PostgreSQL, Redis, and Elasticsearch..."
+	@echo "Truncating PostgreSQL tables..."
+	@export $$(cat .env | grep -v '^#' | xargs) && \
+		psql "$$USER_SERVICE_DB_URL" -c "TRUNCATE TABLE users, refresh_tokens RESTART IDENTITY CASCADE;" && \
+		psql "$$EVENT_SERVICE_DB_URL" -c "TRUNCATE TABLE venues, events, admins, admin_refresh_tokens RESTART IDENTITY CASCADE;" && \
+		psql "$$BOOKING_SERVICE_DB_URL" -c "TRUNCATE TABLE bookings, payments, waitlist, booking_seats RESTART IDENTITY CASCADE;"
+	@echo "Flushing Redis..."
+	@docker exec evently_redis redis-cli FLUSHALL
+	@echo "Deleting Elasticsearch documents..."
+	@curl -s -X POST "http://localhost:9200/events/_delete_by_query?conflicts=proceed" -H 'Content-Type: application/json' -d'{"query": {"match_all": {}}}' > /dev/null || true
+	@echo "✅ All data cleaned successfully."
+
 # Generate everything
 generate: sqlc
 
@@ -191,3 +251,34 @@ install-tools:
 	@go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 	@go install github.com/pressly/goose/v3/cmd/goose@latest
 	@echo "Tools installed successfully"
+
+# Full development setup
+run-all-bg: check-env
+	@echo "Running all services in the background..."
+	@export $$(cat .env | grep -v '^#' | xargs) && go run ./cmd/user-service/main.go &
+	@export $$(cat .env | grep -v '^#' | xargs) && go run ./cmd/event-service/main.go &
+	@export $$(cat .env | grep -v '^#' | xargs) && go run ./cmd/booking-service/main.go &
+	@export $$(cat .env | grep -v '^#' | xargs) && go run ./cmd/search-service/main.go &
+	@echo "Running frontend in the background..."
+	@(cd frontend && bun run dev &)
+	@echo "All services are running in the background."
+
+seed-data:
+	@echo "Seeding data..."
+	@echo "Creating user 1 (atlanuser1@mail.com)..."
+	@curl -s -X POST -H "Content-Type: application/json" -d '{"email": "atlanuser1@mail.com", "password": "11111111", "name": "Atlan User 1"}' http://localhost:8001/api/v1/auth/register > /dev/null
+	@echo "Creating user 2 (atlanuser2@mail.com)..."
+	@curl -s -X POST -H "Content-Type: application/json" -d '{"email": "atlanuser2@mail.com", "password": "11111111", "name": "Atlan User 2"}' http://localhost:8001/api/v1/auth/register > /dev/null
+	@echo "Creating admin (atlanadmin@mail.com)..."
+	@curl -s -X POST -H "Content-Type: application/json" -d '{"email": "atlanadmin@mail.com", "password": "11111111", "name": "Atlan Admin"}' http://localhost:8002/api/v1/auth/admin/register > /dev/null
+	@echo "Data seeded successfully."
+
+dev-setup-full:
+	@make docker-full-up
+	@echo "Waiting for infrastructure to be ready..."
+	@sleep 15
+	@make migrate-up-all
+	@make run-all-bg
+	@echo "Waiting for services to start..."
+	@sleep 5
+	@make seed-data
