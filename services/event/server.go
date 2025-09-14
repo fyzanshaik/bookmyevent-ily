@@ -10,6 +10,7 @@ import (
 	"github.com/fyzanshaik/bookmyevent-ily/internal/config"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/database"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/logger"
+	"github.com/fyzanshaik/bookmyevent-ily/internal/middleware"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/repository/events"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/utils"
 )
@@ -52,8 +53,10 @@ func SetupRoutes(config *APIConfig) *http.ServeMux {
 func StartServer(config *APIConfig) {
 	mux := SetupRoutes(config)
 
+	handler := middleware.CORS(mux)
+
 	server := &http.Server{
-		Handler: mux,
+		Handler: handler,
 		Addr:    ":" + config.Config.Port,
 	}
 

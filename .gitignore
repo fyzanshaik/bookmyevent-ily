@@ -43,4 +43,6 @@ Thumbs.db
 tmp/
 temp/
 
-*.md
+# Markdown files
+
+!README.md
