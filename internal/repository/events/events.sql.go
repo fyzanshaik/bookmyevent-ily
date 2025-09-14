@@ -54,10 +54,10 @@ FROM events e
 JOIN venues v ON e.venue_id = v.venue_id
 WHERE e.status = 'published'
   AND e.start_datetime > CURRENT_TIMESTAMP
-  AND ($1::text IS NULL OR e.event_type = $1)
-  AND ($2::text IS NULL OR v.city ILIKE '%' || $2 || '%')
-  AND ($3::timestamp IS NULL OR e.start_datetime >= $3)
-  AND ($4::timestamp IS NULL OR e.start_datetime <= $4)
+  AND ($1::text = '' OR e.event_type = $1)
+  AND ($2::text = '' OR v.city ILIKE '%' || $2 || '%')
+  AND ($3::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $3)
+  AND ($4::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $4)
 `
 
 type CountPublishedEventsParams struct {
@@ -74,10 +74,10 @@ type CountPublishedEventsParams struct {
 //	JOIN venues v ON e.venue_id = v.venue_id
 //	WHERE e.status = 'published'
 //	  AND e.start_datetime > CURRENT_TIMESTAMP
-//	  AND ($1::text IS NULL OR e.event_type = $1)
-//	  AND ($2::text IS NULL OR v.city ILIKE '%' || $2 || '%')
-//	  AND ($3::timestamp IS NULL OR e.start_datetime >= $3)
-//	  AND ($4::timestamp IS NULL OR e.start_datetime <= $4)
+//	  AND ($1::text = '' OR e.event_type = $1)
+//	  AND ($2::text = '' OR v.city ILIKE '%' || $2 || '%')
+//	  AND ($3::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $3)
+//	  AND ($4::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $4)
 func (q *Queries) CountPublishedEvents(ctx context.Context, arg CountPublishedEventsParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countPublishedEvents,
 		arg.Column1,
@@ -450,10 +450,10 @@ FROM events e
 JOIN venues v ON e.venue_id = v.venue_id
 WHERE e.status = 'published'
   AND e.start_datetime > CURRENT_TIMESTAMP
-  AND ($3::text IS NULL OR e.event_type = $3)
-  AND ($4::text IS NULL OR v.city ILIKE '%' || $4 || '%')
-  AND ($5::timestamp IS NULL OR e.start_datetime >= $5)
-  AND ($6::timestamp IS NULL OR e.start_datetime <= $6)
+  AND ($3::text = '' OR e.event_type = $3)
+  AND ($4::text = '' OR v.city ILIKE '%' || $4 || '%')
+  AND ($5::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $5)
+  AND ($6::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $6)
 ORDER BY e.start_datetime ASC
 LIMIT $1 OFFSET $2
 `
@@ -496,10 +496,10 @@ type ListPublishedEventsRow struct {
 //	JOIN venues v ON e.venue_id = v.venue_id
 //	WHERE e.status = 'published'
 //	  AND e.start_datetime > CURRENT_TIMESTAMP
-//	  AND ($3::text IS NULL OR e.event_type = $3)
-//	  AND ($4::text IS NULL OR v.city ILIKE '%' || $4 || '%')
-//	  AND ($5::timestamp IS NULL OR e.start_datetime >= $5)
-//	  AND ($6::timestamp IS NULL OR e.start_datetime <= $6)
+//	  AND ($3::text = '' OR e.event_type = $3)
+//	  AND ($4::text = '' OR v.city ILIKE '%' || $4 || '%')
+//	  AND ($5::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $5)
+//	  AND ($6::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $6)
 //	ORDER BY e.start_datetime ASC
 //	LIMIT $1 OFFSET $2
 func (q *Queries) ListPublishedEvents(ctx context.Context, arg ListPublishedEventsParams) ([]ListPublishedEventsRow, error) {

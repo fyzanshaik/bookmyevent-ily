@@ -21,3 +21,9 @@ func RespondWithJSON(w http.ResponseWriter, code int, payload any) {
         w.Write([]byte(`{"error":"Internal server error"}`))
     }
 }
+
+func HandleHealthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "healthy"}`))
+}

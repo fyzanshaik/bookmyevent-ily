@@ -87,15 +87,25 @@ func (cfg *APIConfig) AdminRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, err := auth.MakeRefreshToken()
+	refreshTokenString, err := auth.MakeRefreshToken()
 	if err != nil {
 		cfg.Logger.Error("Failed to create refresh token", "error", err)
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create refresh token")
 		return
 	}
 
-	// TODO: Store refresh token (need to create admin_refresh_tokens table or reuse user one)
-	// For now, we'll just return the tokens
+	refreshTokenParams := events.CreateAdminRefreshTokenParams{
+		Token:     refreshTokenString,
+		AdminID:   admin.AdminID,
+		ExpiresAt: time.Now().UTC().Add(cfg.Config.JWTRefreshDuration),
+	}
+
+	_, err = cfg.DB.CreateAdminRefreshToken(r.Context(), refreshTokenParams)
+	if err != nil {
+		cfg.Logger.Error("Failed to store admin refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
+		return
+	}
 
 	response := AdminAuthResponse{
 		AdminID:      admin.AdminID,
@@ -104,7 +114,7 @@ func (cfg *APIConfig) AdminRegister(w http.ResponseWriter, r *http.Request) {
 		Role:         role,
 		Permissions:  "{}",
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		RefreshToken: refreshTokenString,
 	}
 
 	utils.RespondWithJSON(w, http.StatusCreated, response)
@@ -149,10 +159,23 @@ func (cfg *APIConfig) AdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, err := auth.MakeRefreshToken()
+	refreshTokenString, err := auth.MakeRefreshToken()
 	if err != nil {
 		cfg.Logger.Error("Failed to create refresh token", "error", err)
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create refresh token")
+		return
+	}
+
+	refreshTokenParams := events.CreateAdminRefreshTokenParams{
+		Token:     refreshTokenString,
+		AdminID:   admin.AdminID,
+		ExpiresAt: time.Now().UTC().Add(cfg.Config.JWTRefreshDuration),
+	}
+
+	_, err = cfg.DB.CreateAdminRefreshToken(r.Context(), refreshTokenParams)
+	if err != nil {
+		cfg.Logger.Error("Failed to store admin refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
 		return
 	}
 
@@ -163,15 +186,99 @@ func (cfg *APIConfig) AdminLogin(w http.ResponseWriter, r *http.Request) {
 		Role:         role,
 		Permissions:  permissions,
 		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
+		RefreshToken: refreshTokenString,
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func (cfg *APIConfig) AdminRefreshToken(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement proper refresh token logic
-	utils.RespondWithError(w, http.StatusNotImplemented, "Refresh token not implemented yet")
+	refreshTokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+		return
+	}
+
+	refreshToken, err := cfg.DB.GetAdminRefreshToken(r.Context(), refreshTokenString)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Invalid or expired refresh token")
+		return
+	}
+
+	admin, err := cfg.DB.GetAdminByID(r.Context(), refreshToken.AdminID)
+	if err != nil {
+		cfg.Logger.Error("Failed to fetch admin", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch admin information")
+		return
+	}
+
+	role := admin.Role.String
+	permissions := "{}"
+	if admin.Permissions.Valid {
+		permissions = string(admin.Permissions.RawMessage)
+	}
+
+	newAccessToken, err := auth.MakeAdminJWT(admin.AdminID, role, permissions, cfg.Config.JWTSecret, cfg.Config.JWTAccessDuration)
+	if err != nil {
+		cfg.Logger.Error("Failed to create access token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create access token")
+		return
+	}
+
+	newRefreshTokenString, err := auth.MakeRefreshToken()
+	if err != nil {
+		cfg.Logger.Error("Failed to create refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create refresh token")
+		return
+	}
+
+	err = cfg.DB.RevokeAdminRefreshToken(r.Context(), refreshTokenString)
+	if err != nil {
+		cfg.Logger.Error("Failed to revoke old admin refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to revoke old token")
+		return
+	}
+
+	refreshTokenParams := events.CreateAdminRefreshTokenParams{
+		Token:     newRefreshTokenString,
+		AdminID:   admin.AdminID,
+		ExpiresAt: time.Now().UTC().Add(cfg.Config.JWTRefreshDuration),
+	}
+
+	_, err = cfg.DB.CreateAdminRefreshToken(r.Context(), refreshTokenParams)
+	if err != nil {
+		cfg.Logger.Error("Failed to store new admin refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store new refresh token")
+		return
+	}
+
+	response := AdminRefreshTokenResponse{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshTokenString,
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *APIConfig) AdminLogout(w http.ResponseWriter, r *http.Request) {
+	refreshTokenString, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		utils.RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+		return
+	}
+
+	err = cfg.DB.RevokeAdminRefreshToken(r.Context(), refreshTokenString)
+	if err != nil {
+		cfg.Logger.Error("Failed to revoke admin refresh token", "error", err)
+		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to revoke token")
+		return
+	}
+
+	response := map[string]string{
+		"message": "Admin logged out successfully",
+	}
+
+	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func (cfg *APIConfig) ListPublishedEvents(w http.ResponseWriter, r *http.Request) {
@@ -194,7 +301,9 @@ func (cfg *APIConfig) ListPublishedEvents(w http.ResponseWriter, r *http.Request
 	dateFromStr := r.URL.Query().Get("date_from")
 	dateToStr := r.URL.Query().Get("date_to")
 
+	// Use zero time as "no limit" values - the SQL query will handle these properly
 	var dateFrom, dateTo time.Time
+
 	if dateFromStr != "" {
 		if parsed, err := time.Parse("2006-01-02", dateFromStr); err == nil {
 			dateFrom = parsed

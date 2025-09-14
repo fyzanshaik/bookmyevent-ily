@@ -1,4 +1,3 @@
--- Users table
 CREATE TABLE users (
     user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -10,7 +9,6 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Refresh tokens table
 CREATE TABLE refresh_tokens (
     token TEXT PRIMARY KEY,
     user_id UUID NOT NULL,
@@ -24,7 +22,6 @@ CREATE TABLE refresh_tokens (
         ON DELETE CASCADE
 );
 
--- Indexes
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_phone ON users(phone_number);
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);

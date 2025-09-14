@@ -2,6 +2,7 @@ package event
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -10,26 +11,24 @@ import (
 	"github.com/fyzanshaik/bookmyevent-ily/internal/database"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/logger"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/repository/events"
+	"github.com/fyzanshaik/bookmyevent-ily/internal/utils"
 )
 
 func SetupRoutes(config *APIConfig) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	// Health checks
-	mux.HandleFunc("GET /healthz", HandleHealthz)
+	mux.HandleFunc("GET /healthz", utils.HandleHealthz)
 	mux.HandleFunc("GET /health/ready", config.HandleReadiness)
 
-	// Admin Authentication Endpoints
 	mux.HandleFunc("POST /api/v1/auth/admin/register", config.AdminRegister)
 	mux.HandleFunc("POST /api/v1/auth/admin/login", config.AdminLogin)
 	mux.HandleFunc("POST /api/v1/auth/admin/refresh", config.AdminRefreshToken)
+	mux.HandleFunc("POST /api/v1/auth/admin/logout", config.AdminLogout)
 
-	// Public Event Endpoints (shold have high Traffic)
 	mux.HandleFunc("GET /api/v1/events", config.ListPublishedEvents)
 	mux.HandleFunc("GET /api/v1/events/{id}", config.GetEventByID)
 	mux.HandleFunc("GET /api/v1/events/{id}/availability", config.GetEventAvailability)
 
-	// Admin Event Management (Protected)
 	adminAuth := auth.RequireAdminAuth(config.Config.JWTSecret)
 	mux.HandleFunc("POST /api/v1/admin/events", adminAuth(config.CreateEvent))
 	mux.HandleFunc("PUT /api/v1/admin/events/{id}", adminAuth(config.UpdateEvent))
@@ -37,13 +36,11 @@ func SetupRoutes(config *APIConfig) *http.ServeMux {
 	mux.HandleFunc("GET /api/v1/admin/events", adminAuth(config.ListAdminEvents))
 	mux.HandleFunc("GET /api/v1/admin/events/{id}/analytics", adminAuth(config.GetEventAnalytics))
 
-	// Admin Venue Management (Protected)
 	mux.HandleFunc("POST /api/v1/admin/venues", adminAuth(config.CreateVenue))
 	mux.HandleFunc("GET /api/v1/admin/venues", adminAuth(config.ListVenues))
 	mux.HandleFunc("PUT /api/v1/admin/venues/{id}", adminAuth(config.UpdateVenue))
 	mux.HandleFunc("DELETE /api/v1/admin/venues/{id}", adminAuth(config.DeleteVenue))
 
-	// Internal Service Endpoints (Service-to-Service)
 	internalAuth := auth.RequireInternalAuth(config.Config.InternalAPIKey)
 	mux.HandleFunc("POST /internal/events/{id}/update-availability", internalAuth(config.UpdateEventAvailability))
 	mux.HandleFunc("GET /internal/events/{id}", internalAuth(config.GetEventForBooking))
@@ -77,18 +74,24 @@ func InitEventService() (*APIConfig, *sql.DB) {
 
 	dbQueries := events.New(db)
 
+	var searchClient *SearchServiceClient
+	fmt.Printf("DEBUG: SearchServiceURL from config: '%s'\n", cfg.SearchServiceURL)
+	if cfg.SearchServiceURL != "" {
+		searchClient = NewSearchServiceClient(cfg.SearchServiceURL, cfg.InternalAPIKey, logger)
+		logger.Info("Search service client initialized", "search_service_url", cfg.SearchServiceURL)
+		fmt.Printf("DEBUG: SearchServiceClient created successfully\n")
+	} else {
+		logger.Info("Search service URL not configured, search indexing disabled")
+		fmt.Printf("DEBUG: SearchServiceURL is empty, no SearchClient created\n")
+	}
+
 	apiConfig := &APIConfig{
-		DB:      dbQueries,
-		DB_Conn: db,
-		Config:  cfg,
-		Logger:  logger,
+		DB:           dbQueries,
+		DB_Conn:      db,
+		Config:       cfg,
+		Logger:       logger,
+		SearchClient: searchClient,
 	}
 
 	return apiConfig, db
-}
-
-func HandleHealthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status": "healthy"}`))
 }

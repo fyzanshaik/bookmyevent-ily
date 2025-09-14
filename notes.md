@@ -150,3 +150,37 @@ manages."
 
 CHECKING USER DB:
 docker compose exec postgres psql -U postgres -d users_db
+
+Phase 1: Reserve Seats (5 minutes)
+
+1. Authentication: JWT token validation via User Service
+2. Rate Limiting: Redis-based per-user limits
+3. Idempotency: Prevent duplicate reservations using unique keys
+4. Event Validation: Get event details with optimistic locking version
+5. Concurrency Control:
+
+
+    - Row-level locking: FOR UPDATE on event rows
+    - Optimistic locking: Version field increment on updates
+    - Database constraints: Prevent negative available_seats
+
+6. Seat Reservation: Atomic deduction via Event Service
+7. Redis Storage: Temporary reservation with 5-minute TTL
+8. Database Record: Create status="pending" booking
+
+Phase 2: Confirm Booking (within 5 minutes)
+
+1. Reservation Validation: Retrieve from Redis
+2. User Authorization: Ensure user owns the reservation
+3. Mock Payment: Process payment token
+4. Status Update: Change booking status="confirmed"
+5. Ticket Generation: Create ticket URL
+6. Cleanup: Remove reservation from Redis
+7. Waitlist Processing: Offer seats to waitlist users
+
+🔧 Concurrency Protection:
+
+- Event Service: Optimistic locking with version fields
+- Redis: TTL-based automatic cleanup
+- Database: Row-level locks and constraints
+- Race Condition Handling: Version conflicts return retry messages

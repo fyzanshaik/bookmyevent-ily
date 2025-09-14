@@ -153,11 +153,19 @@ func (cfg *APIConfig) LoginUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *APIConfig) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	refreshTokenString, err := auth.GetBearerToken(r.Header)
-	if err != nil {
-		utils.RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+	var requestBody RefreshTokenRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
+
+	if requestBody.RefreshToken == "" {
+		utils.RespondWithError(w, http.StatusBadRequest, "Refresh token is required")
+		return
+	}
+
+	refreshTokenString := requestBody.RefreshToken
 
 	refreshToken, err := cfg.DB.GetRefreshToken(r.Context(), cfg.DB_Conn, refreshTokenString)
 	if err != nil {
@@ -215,13 +223,21 @@ func (cfg *APIConfig) RefreshToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *APIConfig) RevokeToken(w http.ResponseWriter, r *http.Request) {
-	refreshTokenString, err := auth.GetBearerToken(r.Header)
-	if err != nil {
-		utils.RespondWithError(w, http.StatusUnauthorized, "Missing or invalid authorization header")
+	var requestBody LogoutRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
-	err = cfg.DB.RevokeRefreshToken(r.Context(), cfg.DB_Conn, refreshTokenString)
+	if requestBody.RefreshToken == "" {
+		utils.RespondWithError(w, http.StatusBadRequest, "Refresh token is required")
+		return
+	}
+
+	refreshTokenString := requestBody.RefreshToken
+
+	err := cfg.DB.RevokeRefreshToken(r.Context(), cfg.DB_Conn, refreshTokenString)
 	if err != nil {
 		cfg.Logger.Error("Failed to revoke token", "error", err)
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to revoke token")

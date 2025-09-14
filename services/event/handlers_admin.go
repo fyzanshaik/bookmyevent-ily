@@ -1,6 +1,7 @@
 package event
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -97,6 +98,9 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("Created event in db: %s (ID: %s)\n", event.Name, event.EventID.String())
+	cfg.Logger.Info("Event created successfully", "event_id", event.EventID, "event_name", event.Name, "admin_id", adminID)
+
 	response := EventResponse{
 		EventID:              event.EventID,
 		Name:                 event.Name,
@@ -114,6 +118,42 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:            event.CreatedBy,
 		CreatedAt:            event.CreatedAt.Time,
 		UpdatedAt:            event.UpdatedAt.Time,
+	}
+
+	venue, err := cfg.DB.GetVenueByID(r.Context(), event.VenueID)
+	if err != nil {
+		cfg.Logger.Error("Failed to get venue for search indexing", "error", err, "venue_id", event.VenueID)
+	} else {
+		fmt.Printf("DEBUG: SearchClient status: %v (nil=%t)\n", cfg.SearchClient, cfg.SearchClient == nil)
+		if cfg.SearchClient != nil {
+			fmt.Printf("DEBUG: Attempting to index event %s in search service\n", event.Name)
+			go func() {
+				venueResp := VenueResponse{
+					VenueID:      venue.VenueID,
+					Name:         venue.Name,
+					Address:      venue.Address,
+					City:         venue.City,
+					State:        utils.StringPtrFromNullString(venue.State),
+					Country:      venue.Country,
+					PostalCode:   utils.StringPtrFromNullString(venue.PostalCode),
+					Capacity:     venue.Capacity,
+					LayoutConfig: utils.NullRawMessageToJSONRawMessage(venue.LayoutConfig),
+					CreatedAt:    venue.CreatedAt.Time,
+					UpdatedAt:    venue.UpdatedAt.Time,
+				}
+
+				fmt.Printf("DEBUG: Calling SearchClient.IndexEvent for event %s\n", response.Name)
+				ctx := context.Background()
+				if err := cfg.SearchClient.IndexEvent(ctx, response, venueResp); err != nil {
+					cfg.Logger.Error("Failed to index event in search service", "error", err, "event_id", event.EventID)
+					fmt.Printf("DEBUG: IndexEvent failed: %v\n", err)
+				} else {
+					fmt.Printf("DEBUG: IndexEvent succeeded for event %s\n", response.Name)
+				}
+			}()
+		} else {
+			fmt.Printf("DEBUG: SearchClient is nil, search indexing disabled\n")
+		}
 	}
 
 	utils.RespondWithJSON(w, http.StatusCreated, response)
@@ -152,7 +192,6 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to verify event ownership")
 		return
 	}
-
 
 	currentEvent, err := cfg.DB.GetEventByID(r.Context(), eventID)
 	if err != nil {
@@ -247,6 +286,9 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("Update event in db: %s (ID: %s)\n", updatedEvent.Name, updatedEvent.EventID.String())
+	cfg.Logger.Info("Event updated successfully", "event_id", updatedEvent.EventID, "event_name", updatedEvent.Name, "admin_id", adminID)
+
 	response := EventResponse{
 		EventID:        updatedEvent.EventID,
 		Name:           updatedEvent.Name,
@@ -270,6 +312,33 @@ func (cfg *APIConfig) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:            updatedEvent.CreatedBy,
 		CreatedAt:            updatedEvent.CreatedAt.Time,
 		UpdatedAt:            updatedEvent.UpdatedAt.Time,
+	}
+
+	venue, err := cfg.DB.GetVenueByID(r.Context(), updatedEvent.VenueID)
+	if err != nil {
+		cfg.Logger.Error("Failed to get venue for search indexing", "error", err, "venue_id", updatedEvent.VenueID)
+	} else if cfg.SearchClient != nil {
+		go func() {
+			venueResp := VenueResponse{
+				VenueID:      venue.VenueID,
+				Name:         venue.Name,
+				Address:      venue.Address,
+				City:         venue.City,
+				State:        utils.StringPtrFromNullString(venue.State),
+				Country:      venue.Country,
+				PostalCode:   utils.StringPtrFromNullString(venue.PostalCode),
+				Capacity:     venue.Capacity,
+				LayoutConfig: utils.NullRawMessageToJSONRawMessage(venue.LayoutConfig),
+				CreatedAt:    venue.CreatedAt.Time,
+				UpdatedAt:    venue.UpdatedAt.Time,
+			}
+
+			// Use background context instead of request context to avoid cancellation
+			ctx := context.Background()
+			if err := cfg.SearchClient.UpdateEvent(ctx, response, venueResp); err != nil {
+				cfg.Logger.Error("Failed to update event in search service", "error", err, "event_id", updatedEvent.EventID)
+			}
+		}()
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
@@ -323,6 +392,17 @@ func (cfg *APIConfig) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 		cfg.Logger.Error("Failed to delete event", "error", err)
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to delete event")
 		return
+	}
+
+	fmt.Printf("deleted event eventservice: %s\n", eventID.String())
+	cfg.Logger.Info("Event deleted successfully", "event_id", eventID, "admin_id", adminID)
+
+	if cfg.SearchClient != nil {
+		go func() {
+			if err := cfg.SearchClient.DeleteEvent(r.Context(), eventID); err != nil {
+				cfg.Logger.Error("Failed to delete event from search service", "error", err, "event_id", eventID)
+			}
+		}()
 	}
 
 	response := SuccessResponse{

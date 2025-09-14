@@ -24,6 +24,11 @@ type Querier interface {
 	//  FROM events
 	//  WHERE event_id = $1 AND created_by = $2
 	CheckEventOwnership(ctx context.Context, arg CheckEventOwnershipParams) (CheckEventOwnershipRow, error)
+	// CLEANUP EXPIRED ADMIN TOKENS (maintenance)
+	//
+	//  DELETE FROM admin_refresh_tokens
+	//  WHERE expires_at < CURRENT_TIMESTAMP OR revoked_at IS NOT NULL
+	CleanupExpiredAdminTokens(ctx context.Context) error
 	// COUNT ADMINS
 	//
 	//  SELECT COUNT(*) FROM admins
@@ -35,10 +40,10 @@ type Querier interface {
 	//  JOIN venues v ON e.venue_id = v.venue_id
 	//  WHERE e.status = 'published'
 	//    AND e.start_datetime > CURRENT_TIMESTAMP
-	//    AND ($1::text IS NULL OR e.event_type = $1)
-	//    AND ($2::text IS NULL OR v.city ILIKE '%' || $2 || '%')
-	//    AND ($3::timestamp IS NULL OR e.start_datetime >= $3)
-	//    AND ($4::timestamp IS NULL OR e.start_datetime <= $4)
+	//    AND ($1::text = '' OR e.event_type = $1)
+	//    AND ($2::text = '' OR v.city ILIKE '%' || $2 || '%')
+	//    AND ($3::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $3)
+	//    AND ($4::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $4)
 	CountPublishedEvents(ctx context.Context, arg CountPublishedEventsParams) (int64, error)
 	// COUNT VENUES (for pagination)
 	//
@@ -57,6 +62,16 @@ type Querier interface {
 	//  )
 	//  RETURNING admin_id, email, name, phone_number, role, permissions, is_active, created_at
 	CreateAdmin(ctx context.Context, arg CreateAdminParams) (CreateAdminRow, error)
+	// Admin Refresh Token Management Queries
+	// CREATE ADMIN REFRESH TOKEN
+	//
+	//
+	//  INSERT INTO admin_refresh_tokens (
+	//      token, admin_id, expires_at
+	//  ) VALUES (
+	//      $1, $2, $3
+	//  ) RETURNING token, admin_id, expires_at, revoked_at, created_at, updated_at
+	CreateAdminRefreshToken(ctx context.Context, arg CreateAdminRefreshTokenParams) (AdminRefreshToken, error)
 	// Event Management Queries with Concurrency Control
 	// CREATE EVENT
 	//
@@ -111,6 +126,11 @@ type Querier interface {
 	//  FROM admins
 	//  WHERE admin_id = $1
 	GetAdminByID(ctx context.Context, adminID uuid.UUID) (GetAdminByIDRow, error)
+	// GET ADMIN REFRESH TOKEN (for validation)
+	//
+	//  SELECT token, admin_id, expires_at, revoked_at, created_at, updated_at FROM admin_refresh_tokens
+	//  WHERE token = $1 AND expires_at > CURRENT_TIMESTAMP AND revoked_at IS NULL
+	GetAdminRefreshToken(ctx context.Context, token string) (AdminRefreshToken, error)
 	// GET EVENT ANALYTICS (Admin)
 	//
 	//  SELECT
@@ -175,10 +195,10 @@ type Querier interface {
 	//  JOIN venues v ON e.venue_id = v.venue_id
 	//  WHERE e.status = 'published'
 	//    AND e.start_datetime > CURRENT_TIMESTAMP
-	//    AND ($3::text IS NULL OR e.event_type = $3)
-	//    AND ($4::text IS NULL OR v.city ILIKE '%' || $4 || '%')
-	//    AND ($5::timestamp IS NULL OR e.start_datetime >= $5)
-	//    AND ($6::timestamp IS NULL OR e.start_datetime <= $6)
+	//    AND ($3::text = '' OR e.event_type = $3)
+	//    AND ($4::text = '' OR v.city ILIKE '%' || $4 || '%')
+	//    AND ($5::timestamp = '0001-01-01'::timestamp OR e.start_datetime >= $5)
+	//    AND ($6::timestamp = '0001-01-01'::timestamp OR e.start_datetime <= $6)
 	//  ORDER BY e.start_datetime ASC
 	//  LIMIT $1 OFFSET $2
 	ListPublishedEvents(ctx context.Context, arg ListPublishedEventsParams) ([]ListPublishedEventsRow, error)
@@ -204,6 +224,22 @@ type Querier interface {
 	//    AND version = $3
 	//  RETURNING event_id, available_seats, status, version
 	ReturnEventSeats(ctx context.Context, arg ReturnEventSeatsParams) (ReturnEventSeatsRow, error)
+	// REVOKE ADMIN REFRESH TOKEN (logout)
+	//
+	//  UPDATE admin_refresh_tokens
+	//  SET
+	//      revoked_at = CURRENT_TIMESTAMP,
+	//      updated_at = CURRENT_TIMESTAMP
+	//  WHERE token = $1
+	RevokeAdminRefreshToken(ctx context.Context, token string) error
+	// REVOKE ALL ADMIN TOKENS (security action)
+	//
+	//  UPDATE admin_refresh_tokens
+	//  SET
+	//      revoked_at = CURRENT_TIMESTAMP,
+	//      updated_at = CURRENT_TIMESTAMP
+	//  WHERE admin_id = $1 AND revoked_at IS NULL
+	RevokeAllAdminTokens(ctx context.Context, adminID uuid.UUID) error
 	// SEARCH VENUES
 	//
 	//  SELECT venue_id, name, address, city, state, country, postal_code, capacity, layout_config, created_at, updated_at FROM venues

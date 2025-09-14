@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/utils"
+	"github.com/google/uuid"
 )
 
 type UserContextKey string
@@ -79,7 +79,6 @@ func RequireAdminAuth(jwtSecret string) func(http.HandlerFunc) http.HandlerFunc 
 				return
 			}
 
-			// Add admin ID to context
 			ctx := context.WithValue(r.Context(), AdminIDKey, claims.AdminID)
 			r = r.WithContext(ctx)
 

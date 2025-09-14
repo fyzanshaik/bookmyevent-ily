@@ -5,21 +5,20 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/config"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/logger"
 	"github.com/fyzanshaik/bookmyevent-ily/internal/repository/events"
+	"github.com/google/uuid"
 )
 
-// APIConfig holds the configuration for the Event Service
 type APIConfig struct {
-	DB      events.Querier
-	DB_Conn *sql.DB
-	Config  *config.EventServiceConfig
-	Logger  *logger.Logger
+	DB           events.Querier
+	DB_Conn      *sql.DB
+	Config       *config.EventServiceConfig
+	Logger       *logger.Logger
+	SearchClient *SearchServiceClient
 }
 
-// Admin Authentication Models
 type AdminRegisterRequest struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
@@ -52,64 +51,63 @@ type AdminRefreshTokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// Event Management Models
 type CreateEventRequest struct {
-	Name                  string             `json:"name"`
-	Description           string             `json:"description,omitempty"`
-	VenueID               uuid.UUID          `json:"venue_id"`
-	EventType             string             `json:"event_type"`
-	StartDatetime         time.Time          `json:"start_datetime"`
-	EndDatetime           time.Time          `json:"end_datetime"`
-	TotalCapacity         int32              `json:"total_capacity"`
-	BasePrice             float64            `json:"base_price"`
-	MaxTicketsPerBooking  int32              `json:"max_tickets_per_booking,omitempty"`
+	Name                 string    `json:"name"`
+	Description          string    `json:"description,omitempty"`
+	VenueID              uuid.UUID `json:"venue_id"`
+	EventType            string    `json:"event_type"`
+	StartDatetime        time.Time `json:"start_datetime"`
+	EndDatetime          time.Time `json:"end_datetime"`
+	TotalCapacity        int32     `json:"total_capacity"`
+	BasePrice            float64   `json:"base_price"`
+	MaxTicketsPerBooking int32     `json:"max_tickets_per_booking,omitempty"`
 }
 
 type UpdateEventRequest struct {
-	Name                  *string    `json:"name,omitempty"`
-	Description           *string    `json:"description,omitempty"`
-	VenueID               *uuid.UUID `json:"venue_id,omitempty"`
-	EventType             *string    `json:"event_type,omitempty"`
-	StartDatetime         *time.Time `json:"start_datetime,omitempty"`
-	EndDatetime           *time.Time `json:"end_datetime,omitempty"`
-	TotalCapacity         *int32     `json:"total_capacity,omitempty"`
-	AvailableSeats        *int32     `json:"available_seats,omitempty"`
-	BasePrice             *float64   `json:"base_price,omitempty"`
-	MaxTicketsPerBooking  *int32     `json:"max_tickets_per_booking,omitempty"`
-	Status                *string    `json:"status,omitempty"`
-	Version               int32      `json:"version"`
+	Name                 *string    `json:"name,omitempty"`
+	Description          *string    `json:"description,omitempty"`
+	VenueID              *uuid.UUID `json:"venue_id,omitempty"`
+	EventType            *string    `json:"event_type,omitempty"`
+	StartDatetime        *time.Time `json:"start_datetime,omitempty"`
+	EndDatetime          *time.Time `json:"end_datetime,omitempty"`
+	TotalCapacity        *int32     `json:"total_capacity,omitempty"`
+	AvailableSeats       *int32     `json:"available_seats,omitempty"`
+	BasePrice            *float64   `json:"base_price,omitempty"`
+	MaxTicketsPerBooking *int32     `json:"max_tickets_per_booking,omitempty"`
+	Status               *string    `json:"status,omitempty"`
+	Version              int32      `json:"version"`
 }
 
 type EventResponse struct {
-	EventID               uuid.UUID    `json:"event_id"`
-	Name                  string       `json:"name"`
-	Description           *string      `json:"description,omitempty"`
-	VenueID               uuid.UUID    `json:"venue_id"`
-	VenueName             *string      `json:"venue_name,omitempty"`
-	VenueAddress          *string      `json:"venue_address,omitempty"`
-	VenueCity             *string      `json:"venue_city,omitempty"`
-	VenueState            *string      `json:"venue_state,omitempty"`
-	VenueCountry          *string      `json:"venue_country,omitempty"`
-	EventType             string       `json:"event_type"`
-	StartDatetime         time.Time    `json:"start_datetime"`
-	EndDatetime           time.Time    `json:"end_datetime"`
-	TotalCapacity         int32        `json:"total_capacity"`
-	AvailableSeats        int32        `json:"available_seats"`
-	BasePrice             float64      `json:"base_price"`
-	MaxTicketsPerBooking  int32        `json:"max_tickets_per_booking"`
-	Status                string       `json:"status"`
-	Version               int32        `json:"version"`
-	CreatedBy             uuid.UUID    `json:"created_by"`
-	CreatedAt             time.Time    `json:"created_at"`
-	UpdatedAt             time.Time    `json:"updated_at"`
+	EventID              uuid.UUID `json:"event_id"`
+	Name                 string    `json:"name"`
+	Description          *string   `json:"description,omitempty"`
+	VenueID              uuid.UUID `json:"venue_id"`
+	VenueName            *string   `json:"venue_name,omitempty"`
+	VenueAddress         *string   `json:"venue_address,omitempty"`
+	VenueCity            *string   `json:"venue_city,omitempty"`
+	VenueState           *string   `json:"venue_state,omitempty"`
+	VenueCountry         *string   `json:"venue_country,omitempty"`
+	EventType            string    `json:"event_type"`
+	StartDatetime        time.Time `json:"start_datetime"`
+	EndDatetime          time.Time `json:"end_datetime"`
+	TotalCapacity        int32     `json:"total_capacity"`
+	AvailableSeats       int32     `json:"available_seats"`
+	BasePrice            float64   `json:"base_price"`
+	MaxTicketsPerBooking int32     `json:"max_tickets_per_booking"`
+	Status               string    `json:"status"`
+	Version              int32     `json:"version"`
+	CreatedBy            uuid.UUID `json:"created_by"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 type EventListResponse struct {
-	Events   []EventResponse `json:"events"`
-	Total    int64           `json:"total"`
-	Page     int             `json:"page"`
-	Limit    int             `json:"limit"`
-	HasMore  bool            `json:"has_more"`
+	Events  []EventResponse `json:"events"`
+	Total   int64           `json:"total"`
+	Page    int             `json:"page"`
+	Limit   int             `json:"limit"`
+	HasMore bool            `json:"has_more"`
 }
 
 type EventAvailabilityResponse struct {
@@ -119,17 +117,16 @@ type EventAvailabilityResponse struct {
 }
 
 type EventAnalyticsResponse struct {
-	EventID              uuid.UUID `json:"event_id"`
-	Name                 string    `json:"name"`
-	TotalCapacity        int32     `json:"total_capacity"`
-	AvailableSeats       int32     `json:"available_seats"`
-	TicketsSold          int32     `json:"tickets_sold"`
-	CapacityUtilization  float64   `json:"capacity_utilization"`
-	BasePrice            float64   `json:"base_price"`
-	EstimatedRevenue     float64   `json:"estimated_revenue"`
+	EventID             uuid.UUID `json:"event_id"`
+	Name                string    `json:"name"`
+	TotalCapacity       int32     `json:"total_capacity"`
+	AvailableSeats      int32     `json:"available_seats"`
+	TicketsSold         int32     `json:"tickets_sold"`
+	CapacityUtilization float64   `json:"capacity_utilization"`
+	BasePrice           float64   `json:"base_price"`
+	EstimatedRevenue    float64   `json:"estimated_revenue"`
 }
 
-// Venue Management Models
 type CreateVenueRequest struct {
 	Name         string          `json:"name"`
 	Address      string          `json:"address"`
@@ -174,7 +171,6 @@ type VenueListResponse struct {
 	HasMore bool            `json:"has_more"`
 }
 
-// Internal Service Models (for Booking Service communication)
 type UpdateAvailabilityRequest struct {
 	Quantity int32 `json:"quantity"`
 	Version  int32 `json:"version"`
@@ -209,7 +205,6 @@ type EventForBookingResponse struct {
 	Name                 string    `json:"name"`
 }
 
-// Standard Response Models
 type SuccessResponse struct {
 	Message string `json:"message"`
 }

@@ -25,6 +25,15 @@ type Admin struct {
 	UpdatedAt    sql.NullTime          `json:"updated_at"`
 }
 
+type AdminRefreshToken struct {
+	Token     string       `json:"token"`
+	AdminID   uuid.UUID    `json:"admin_id"`
+	ExpiresAt time.Time    `json:"expires_at"`
+	RevokedAt sql.NullTime `json:"revoked_at"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
+}
+
 type Event struct {
 	EventID              uuid.UUID      `json:"event_id"`
 	Name                 string         `json:"name"`

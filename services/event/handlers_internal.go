@@ -1,6 +1,7 @@
 package event
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -37,7 +38,7 @@ func (cfg *APIConfig) UpdateEventAvailability(w http.ResponseWriter, r *http.Req
 	}
 
 	if requestBody.Quantity < 0 {
-		seatsToReserve := -requestBody.Quantity 
+		seatsToReserve := -requestBody.Quantity
 
 		params := events.UpdateEventAvailabilityParams{
 			EventID:        eventID,
@@ -78,6 +79,9 @@ func (cfg *APIConfig) UpdateEventAvailability(w http.ResponseWriter, r *http.Req
 			"remaining_seats", result.AvailableSeats,
 			"new_version", result.Version)
 
+		fmt.Printf("Reserving %d seats for event %s, %d seats remaining\n", seatsToReserve, eventID.String(), result.AvailableSeats)
+		cfg.updateSearchAvailability(r.Context(), eventID, result.AvailableSeats)
+
 		utils.RespondWithJSON(w, http.StatusOK, response)
 
 	} else {
@@ -116,6 +120,8 @@ func (cfg *APIConfig) UpdateEventAvailability(w http.ResponseWriter, r *http.Req
 			"available_seats", result.AvailableSeats,
 			"new_version", result.Version)
 
+		fmt.Printf("Return here %d seats for event %s, %d seats available\n", requestBody.Quantity, eventID.String(), result.AvailableSeats)
+		cfg.updateSearchAvailability(r.Context(), eventID, result.AvailableSeats)
 		utils.RespondWithJSON(w, http.StatusOK, response)
 	}
 }
@@ -179,6 +185,8 @@ func (cfg *APIConfig) ReturnEventSeats(w http.ResponseWriter, r *http.Request) {
 		"available_seats", result.AvailableSeats,
 		"new_version", result.Version)
 
+	fmt.Printf("Returned %d seats/internal/events/{id}/return-seats endpoint for event %s, %d seats available\n", requestBody.Quantity, eventID.String(), result.AvailableSeats)
+	cfg.updateSearchAvailability(r.Context(), eventID, result.AvailableSeats)
 	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
@@ -217,7 +225,6 @@ func (cfg *APIConfig) GetEventForBooking(w http.ResponseWriter, r *http.Request)
 		Name:    event.Name,
 	}
 
-	// Log the booking request for monitoring
 	cfg.Logger.Info("Event fetched for booking validation",
 		"event_id", eventID,
 		"available_seats", event.AvailableSeats,
@@ -225,4 +232,69 @@ func (cfg *APIConfig) GetEventForBooking(w http.ResponseWriter, r *http.Request)
 		"version", event.Version)
 
 	utils.RespondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *APIConfig) updateSearchAvailability(ctx context.Context, eventID uuid.UUID, availableSeats int32) {
+	if cfg.SearchClient == nil {
+		return
+	}
+
+	go func() {
+		event, err := cfg.DB.GetEventByID(ctx, eventID)
+		if err != nil {
+			cfg.Logger.Error("Failed to get event for search availability update", "error", err, "event_id", eventID)
+			return
+		}
+
+		venue, err := cfg.DB.GetVenueByID(ctx, event.VenueID)
+		if err != nil {
+			cfg.Logger.Error("Failed to get venue for search availability update", "error", err, "venue_id", event.VenueID)
+			return
+		}
+
+		response := EventResponse{
+			EventID:        event.EventID,
+			Name:           event.Name,
+			Description:    utils.StringPtrFromNullString(event.Description),
+			VenueID:        event.VenueID,
+			EventType:      event.EventType,
+			StartDatetime:  event.StartDatetime,
+			EndDatetime:    event.EndDatetime,
+			TotalCapacity:  event.TotalCapacity,
+			AvailableSeats: event.AvailableSeats,
+			BasePrice: func() float64 {
+				var price float64
+				if _, err := fmt.Sscanf(event.BasePrice, "%f", &price); err != nil {
+					return 0.0
+				}
+				return price
+			}(),
+			MaxTicketsPerBooking: event.MaxTicketsPerBooking.Int32,
+			Status:               event.Status.String,
+			Version:              event.Version,
+			CreatedBy:            event.CreatedBy,
+			CreatedAt:            event.CreatedAt.Time,
+			UpdatedAt:            event.UpdatedAt.Time,
+		}
+
+		venueResp := VenueResponse{
+			VenueID:      venue.VenueID,
+			Name:         venue.Name,
+			Address:      venue.Address,
+			City:         venue.City,
+			State:        utils.StringPtrFromNullString(venue.State),
+			Country:      venue.Country,
+			PostalCode:   utils.StringPtrFromNullString(venue.PostalCode),
+			Capacity:     venue.Capacity,
+			LayoutConfig: utils.NullRawMessageToJSONRawMessage(venue.LayoutConfig),
+			CreatedAt:    venue.CreatedAt.Time,
+			UpdatedAt:    venue.UpdatedAt.Time,
+		}
+
+		if err := cfg.SearchClient.UpdateEvent(ctx, response, venueResp); err != nil {
+			cfg.Logger.Error("Failed to update event availability in search service", "error", err, "event_id", eventID)
+		} else {
+			cfg.Logger.Debug("Updated event availability in search service", "event_id", eventID, "available_seats", availableSeats)
+		}
+	}()
 }

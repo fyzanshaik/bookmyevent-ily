@@ -35,14 +35,19 @@ func GetBearerToken(headers http.Header) (string, error) {
 }
 
 func GetAPIKey(headers http.Header) (string, error) {
+	apiKey := headers.Get("X-API-Key")
+	if apiKey != "" {
+		return apiKey, nil
+	}
+
 	authorizationHeader := headers.Get("Authorization")
 	if authorizationHeader == "" {
-		return "", fmt.Errorf("authorization header doesn't exist")
+		return "", fmt.Errorf("API key not found in X-API-Key header or Authorization header")
 	}
 
 	splitHeader := strings.Split(authorizationHeader, " ")
 	if len(splitHeader) < 2 || splitHeader[0] != "ApiKey" {
-		return "", fmt.Errorf("api key doesn't exist")
+		return "", fmt.Errorf("api key doesn't exist in Authorization header")
 	}
 
 	return splitHeader[1], nil
