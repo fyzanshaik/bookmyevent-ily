@@ -25,16 +25,19 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 
 	var requestBody CreateEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in event creation")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Name == "" || requestBody.EventType == "" {
+		cfg.Logger.Warn("Event creation with missing required fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "Name and event_type are required")
 		return
 	}
 
 	if requestBody.VenueID == uuid.Nil {
+		cfg.Logger.Warn("Event creation without venue ID")
 		utils.RespondWithError(w, http.StatusBadRequest, "venue_id is required")
 		return
 	}
@@ -87,19 +90,19 @@ func (cfg *APIConfig) CreateEvent(w http.ResponseWriter, r *http.Request) {
 
 	event, err := cfg.DB.CreateEvent(r.Context(), params)
 	if err != nil {
-		cfg.Logger.Error("Failed to create event", "error", err)
 		if strings.Contains(err.Error(), "foreign key") ||
 			strings.Contains(err.Error(), "violates foreign key constraint") ||
 			strings.Contains(err.Error(), "fk_venue") {
+			cfg.Logger.WithFields(map[string]any{"venue_id": requestBody.VenueID, "event_name": requestBody.Name}).Warn("Event creation with invalid venue ID")
 			utils.RespondWithError(w, http.StatusBadRequest, "Invalid venue ID - venue does not exist")
 			return
 		}
+		cfg.Logger.WithFields(map[string]any{"event_name": requestBody.Name, "error": err.Error()}).Error("Event creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create event")
 		return
 	}
 
-	fmt.Printf("Created event in db: %s (ID: %s)\n", event.Name, event.EventID.String())
-	cfg.Logger.Info("Event created successfully", "event_id", event.EventID, "event_name", event.Name, "admin_id", adminID)
+	cfg.Logger.WithFields(map[string]any{"event_id": event.EventID, "event_name": event.Name, "admin_id": adminID}).Info("Event created successfully")
 
 	response := EventResponse{
 		EventID:              event.EventID,

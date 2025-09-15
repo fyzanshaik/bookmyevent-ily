@@ -23,16 +23,19 @@ func (cfg *APIConfig) UpdateEventAvailability(w http.ResponseWriter, r *http.Req
 
 	var requestBody UpdateAvailabilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in availability update")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Quantity == 0 {
+		cfg.Logger.WithFields(map[string]any{"event_id": eventID}).Warn("Availability update with zero quantity")
 		utils.RespondWithError(w, http.StatusBadRequest, "Quantity cannot be zero")
 		return
 	}
 
 	if requestBody.Version <= 0 {
+		cfg.Logger.WithFields(map[string]any{"event_id": eventID, "version": requestBody.Version}).Warn("Availability update with invalid version")
 		utils.RespondWithError(w, http.StatusBadRequest, "Version must be positive")
 		return
 	}

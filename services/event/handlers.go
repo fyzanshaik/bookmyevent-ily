@@ -33,18 +33,20 @@ func (cfg *APIConfig) AdminRegister(w http.ResponseWriter, r *http.Request) {
 	var requestBody AdminRegisterRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in admin registration")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Email == "" || requestBody.Password == "" || requestBody.Name == "" {
+		cfg.Logger.Warn("Admin registration attempt with missing fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "Email, password, and name are required")
 		return
 	}
 
 	hashedPassword, err := auth.HashedPassword(requestBody.Password)
 	if err != nil {
-		cfg.Logger.Error("Failed to hash password", "error", err)
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Error("Admin password hashing failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
@@ -71,10 +73,11 @@ func (cfg *APIConfig) AdminRegister(w http.ResponseWriter, r *http.Request) {
 	admin, err := cfg.DB.CreateAdmin(r.Context(), params)
 	if err != nil {
 		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
+			cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Admin registration with existing email")
 			utils.RespondWithError(w, http.StatusConflict, "Email already exists")
 			return
 		}
-		cfg.Logger.Error("Failed to create admin", "error", err)
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email, "error": err.Error()}).Error("Admin creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create admin")
 		return
 	}
@@ -102,10 +105,12 @@ func (cfg *APIConfig) AdminRegister(w http.ResponseWriter, r *http.Request) {
 
 	_, err = cfg.DB.CreateAdminRefreshToken(r.Context(), refreshTokenParams)
 	if err != nil {
-		cfg.Logger.Error("Failed to store admin refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"admin_id": admin.AdminID, "error": err.Error()}).Error("Admin refresh token storage failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"admin_id": admin.AdminID, "email": admin.Email, "role": role}).Info("Admin registered successfully")
 
 	response := AdminAuthResponse{
 		AdminID:      admin.AdminID,
@@ -124,23 +129,26 @@ func (cfg *APIConfig) AdminLogin(w http.ResponseWriter, r *http.Request) {
 	var requestBody AdminLoginRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in admin login")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Email == "" || requestBody.Password == "" {
+		cfg.Logger.Warn("Admin login attempt with missing credentials")
 		utils.RespondWithError(w, http.StatusBadRequest, "Email and password are required")
 		return
 	}
 
 	admin, err := cfg.DB.GetAdminByEmail(r.Context(), requestBody.Email)
 	if err != nil {
-		cfg.Logger.Error("Failed to fetch admin", "error", err)
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Admin login attempt with invalid email")
 		utils.RespondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
 
 	if err := auth.CheckPasswordHash(admin.PasswordHash, requestBody.Password); err != nil {
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Admin login attempt with incorrect password")
 		utils.RespondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
@@ -174,10 +182,12 @@ func (cfg *APIConfig) AdminLogin(w http.ResponseWriter, r *http.Request) {
 
 	_, err = cfg.DB.CreateAdminRefreshToken(r.Context(), refreshTokenParams)
 	if err != nil {
-		cfg.Logger.Error("Failed to store admin refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"admin_id": admin.AdminID, "error": err.Error()}).Error("Admin refresh token storage failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"admin_id": admin.AdminID, "email": admin.Email, "role": role}).Info("Admin logged in successfully")
 
 	response := AdminAuthResponse{
 		AdminID:      admin.AdminID,

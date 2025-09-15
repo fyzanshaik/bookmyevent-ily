@@ -23,16 +23,19 @@ func (cfg *APIConfig) CreateVenue(w http.ResponseWriter, r *http.Request) {
 
 	var requestBody CreateVenueRequest
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in venue creation")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Name == "" || requestBody.Address == "" || requestBody.City == "" {
+		cfg.Logger.Warn("Venue creation with missing required fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "Name, address, and city are required")
 		return
 	}
 
 	if requestBody.Capacity <= 0 {
+		cfg.Logger.WithFields(map[string]any{"capacity": requestBody.Capacity}).Warn("Venue creation with invalid capacity")
 		utils.RespondWithError(w, http.StatusBadRequest, "Capacity must be positive")
 		return
 	}
@@ -60,10 +63,12 @@ func (cfg *APIConfig) CreateVenue(w http.ResponseWriter, r *http.Request) {
 
 	venue, err := cfg.DB.CreateVenue(r.Context(), params)
 	if err != nil {
-		cfg.Logger.Error("Failed to create venue", "error", err)
+		cfg.Logger.WithFields(map[string]any{"name": requestBody.Name, "error": err.Error()}).Error("Venue creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create venue")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"venue_id": venue.VenueID, "name": venue.Name}).Info("Venue created successfully")
 
 	response := VenueResponse{
 		VenueID:      venue.VenueID,

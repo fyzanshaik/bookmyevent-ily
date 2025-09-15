@@ -205,11 +205,13 @@ func (cfg *APIConfig) GetTrendingEvents(w http.ResponseWriter, r *http.Request) 
 func (cfg *APIConfig) IndexEvent(w http.ResponseWriter, r *http.Request) {
 	var req IndexEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in event indexing")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if req.Event.EventID == uuid.Nil {
+		cfg.Logger.Warn("Event indexing without event ID")
 		utils.RespondWithError(w, http.StatusBadRequest, "Event ID is required")
 		return
 	}
@@ -222,7 +224,7 @@ func (cfg *APIConfig) IndexEvent(w http.ResponseWriter, r *http.Request) {
 
 	cfg.invalidateSearchCache(r.Context())
 
-	cfg.Logger.Info("Event indexed successfully", "event_id", req.Event.EventID)
+	cfg.Logger.WithFields(map[string]any{"event_id": req.Event.EventID, "event_name": req.Event.Name}).Info("Event indexed successfully")
 
 	response := IndexEventResponse{
 		Status:  "indexed",
@@ -236,6 +238,7 @@ func (cfg *APIConfig) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 	eventIDStr := r.PathValue("id")
 	eventID, err := uuid.Parse(eventIDStr)
 	if err != nil {
+		cfg.Logger.WithFields(map[string]any{"event_id_str": eventIDStr, "error": err.Error()}).Warn("Invalid event ID format in delete request")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid event ID format")
 		return
 	}
@@ -248,7 +251,7 @@ func (cfg *APIConfig) DeleteEvent(w http.ResponseWriter, r *http.Request) {
 
 	cfg.invalidateSearchCache(r.Context())
 
-	cfg.Logger.Info("Event deleted successfully", "event_id", eventID)
+	cfg.Logger.WithFields(map[string]any{"event_id": eventID}).Info("Event deleted from search index")
 
 	response := DeleteEventResponse{
 		Status:  "deleted",

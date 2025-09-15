@@ -54,6 +54,7 @@ func StartServer(config *APIConfig) {
 	mux := SetupRoutes(config)
 
 	handler := middleware.CORS(mux)
+	handler = middleware.LoggingMiddleware(config.Logger)(handler)
 
 	server := &http.Server{
 		Handler: handler,
