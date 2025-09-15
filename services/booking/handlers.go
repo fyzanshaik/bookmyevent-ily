@@ -174,18 +174,9 @@ func (cfg *APIConfig) ReserveSeats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if event.AvailableSeats < req.Quantity && !isWaitlistUser {
-		errorMsg := "Not enough seats available"
-		if event.AvailableSeats == 0 {
-			errorMsg = "Event is sold out. You can join the waitlist to be notified when seats become available."
-		}
-		utils.RespondWithError(w, http.StatusConflict, errorMsg)
-		return
-	}
-
 	updateResp, err := cfg.EventServiceClient.UpdateAvailability(r.Context(), req.EventID, -req.Quantity, event.Version)
 	if err != nil {
-		cfg.Logger.Error("Failed to reserve seats", "error", err, "event_id", req.EventID, "quantity", req.Quantity)
+		cfg.Logger.Error("Failed to reserve seats", "error", err, "event_id", req.EventID, "quantity", req.Quantity, "version", event.Version)
 
 		if strings.Contains(err.Error(), "Not enough seats available") {
 			utils.RespondWithError(w, http.StatusConflict, "Not enough seats available")

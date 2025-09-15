@@ -36,8 +36,8 @@ RETURNING event_id, available_seats, status, version;
 2. If payment succeeds → booking confirmed
 3. If payment fails/expires → seats returned to pool via ReturnEventSeats
 ```
-
-## Concurrency Protection Mechanisms
+Concurrency
+##  Protection Mechanisms
 
 ### 1. Row-Level Locking
 ```sql

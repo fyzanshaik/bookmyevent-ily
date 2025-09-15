@@ -61,6 +61,7 @@ WHERE event_id = $1
   AND available_seats >= $2
 RETURNING event_id, available_seats, status, version;
 
+
 -- name: ReturnEventSeats :one
 UPDATE events
 SET available_seats = available_seats + $2,

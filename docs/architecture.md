@@ -37,9 +37,9 @@ Evently is a scalable event booking platform designed to handle high-traffic tic
 │  Replicas  │       │                │    │
 └────────────┴───────┴────────────────┴────┘
        │                      ▲
-       │     CDC Pipeline     │
+       │     Data ingestion Pipeline │
        └──────────────────────┘
-         (Debezium + Kafka)
+
 ```
 
 ## Database Architecture

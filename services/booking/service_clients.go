@@ -111,6 +111,7 @@ func (c *EventServiceClient) GetEventForBooking(ctx context.Context, eventID uui
 
 
 
+
 func (c *EventServiceClient) UpdateAvailability(ctx context.Context, eventID uuid.UUID, quantity, version int32) (*UpdateAvailabilityResponse, error) {
 	requestBody := UpdateAvailabilityRequest{
 		Quantity: quantity,
