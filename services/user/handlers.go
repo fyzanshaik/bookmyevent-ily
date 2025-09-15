@@ -16,18 +16,20 @@ func (cfg *APIConfig) AddUser(w http.ResponseWriter, r *http.Request) {
 	var requestBody CreateUserRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in registration request")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Email == "" || requestBody.Password == "" || requestBody.Name == "" {
+		cfg.Logger.Warn("Registration attempt with missing fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "Email, password, and name are required")
 		return
 	}
 
 	hashedPassword, err := auth.HashedPassword(requestBody.Password)
 	if err != nil {
-		cfg.Logger.Error("Failed to hash password", "error", err)
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Error("Password hashing failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to hash password")
 		return
 	}
@@ -46,21 +48,21 @@ func (cfg *APIConfig) AddUser(w http.ResponseWriter, r *http.Request) {
 
 	dbUser, err := cfg.DB.CreateUser(r.Context(), cfg.DB_Conn, params)
 	if err != nil {
-		cfg.Logger.Error("Failed to create user", "error", err)
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email, "error": err.Error()}).Error("User creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create user")
 		return
 	}
 
 	accessToken, err := auth.MakeJWT(dbUser.UserID, cfg.Config.JWTSecret, cfg.Config.JWTAccessDuration)
 	if err != nil {
-		cfg.Logger.Error("Failed to create access token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": dbUser.UserID, "error": err.Error()}).Error("Access token creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create access token")
 		return
 	}
 
 	refreshTokenString, err := auth.MakeRefreshToken()
 	if err != nil {
-		cfg.Logger.Error("Failed to create refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": dbUser.UserID, "error": err.Error()}).Error("Refresh token creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create refresh token")
 		return
 	}
@@ -73,10 +75,12 @@ func (cfg *APIConfig) AddUser(w http.ResponseWriter, r *http.Request) {
 
 	_, err = cfg.DB.CreateRefreshToken(r.Context(), cfg.DB_Conn, refreshTokenParams)
 	if err != nil {
-		cfg.Logger.Error("Failed to store refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": dbUser.UserID, "error": err.Error()}).Error("Refresh token storage failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"user_id": dbUser.UserID, "email": dbUser.Email}).Info("User registered successfully")
 
 	response := AuthResponse{
 		UserID:       dbUser.UserID,
@@ -93,37 +97,40 @@ func (cfg *APIConfig) LoginUser(w http.ResponseWriter, r *http.Request) {
 	var requestBody UserLoginRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error()}).Warn("Invalid JSON in login request")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if requestBody.Email == "" || requestBody.Password == "" {
+		cfg.Logger.Warn("Login attempt with missing credentials")
 		utils.RespondWithError(w, http.StatusBadRequest, "Email and password are required")
 		return
 	}
 
 	currentUser, err := cfg.DB.GetUserByEmail(r.Context(), cfg.DB_Conn, requestBody.Email)
 	if err != nil {
-		cfg.Logger.Error("Failed to fetch user", "error", err)
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Login attempt with invalid email")
 		utils.RespondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
 
 	if err := auth.CheckPasswordHash(currentUser.PasswordHash, requestBody.Password); err != nil {
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Login attempt with incorrect password")
 		utils.RespondWithError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
 
 	accessToken, err := auth.MakeJWT(currentUser.UserID, cfg.Config.JWTSecret, cfg.Config.JWTAccessDuration)
 	if err != nil {
-		cfg.Logger.Error("Failed to create access token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": currentUser.UserID, "error": err.Error()}).Error("Access token creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create access token")
 		return
 	}
 
 	refreshTokenString, err := auth.MakeRefreshToken()
 	if err != nil {
-		cfg.Logger.Error("Failed to create refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": currentUser.UserID, "error": err.Error()}).Error("Refresh token creation failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to create refresh token")
 		return
 	}
@@ -136,10 +143,12 @@ func (cfg *APIConfig) LoginUser(w http.ResponseWriter, r *http.Request) {
 
 	_, err = cfg.DB.CreateRefreshToken(r.Context(), cfg.DB_Conn, refreshTokenParams)
 	if err != nil {
-		cfg.Logger.Error("Failed to store refresh token", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": currentUser.UserID, "error": err.Error()}).Error("Refresh token storage failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to store refresh token")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"user_id": currentUser.UserID, "email": currentUser.Email}).Info("User logged in successfully")
 
 	response := AuthResponse{
 		UserID:       currentUser.UserID,
@@ -175,7 +184,7 @@ func (cfg *APIConfig) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	user, err := cfg.DB.GetUserByID(r.Context(), cfg.DB_Conn, refreshToken.UserID)
 	if err != nil {
-		cfg.Logger.Error("Failed to fetch user", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": refreshToken.UserID, "error": err.Error()}).Error("User fetch failed during token refresh")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch user information")
 		return
 	}
@@ -260,7 +269,7 @@ func (cfg *APIConfig) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	user, err := cfg.DB.GetUserByID(r.Context(), cfg.DB_Conn, userID)
 	if err != nil {
-		cfg.Logger.Error("Failed to fetch user", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": userID, "error": err.Error()}).Error("User fetch failed for profile")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to fetch user information")
 		return
 	}
@@ -321,10 +330,12 @@ func (cfg *APIConfig) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	updatedUser, err := cfg.DB.UpdateUser(r.Context(), cfg.DB_Conn, params)
 	if err != nil {
-		cfg.Logger.Error("Failed to update user", "error", err)
+		cfg.Logger.WithFields(map[string]any{"user_id": userID, "error": err.Error()}).Error("User update failed")
 		utils.RespondWithError(w, http.StatusInternalServerError, "Failed to update user")
 		return
 	}
+
+	cfg.Logger.WithFields(map[string]any{"user_id": userID}).Info("User profile updated")
 
 	var phoneNumber *string
 	if updatedUser.PhoneNumber.Valid {
