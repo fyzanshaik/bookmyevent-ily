@@ -7,13 +7,19 @@ import (
 )
 
 func HandleHealthz(w http.ResponseWriter, r *http.Request) {
-	utils.RespondWithJSON(w, http.StatusOK, map[string]string{"status": "healthy"})
+	response := map[string]any{
+		"status":  "healthy",
+		"service": "user-service",
+		"message": "Service is running normally",
+	}
+	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
 func (cfg *APIConfig) HandleReadiness(w http.ResponseWriter, r *http.Request) {
-	response := map[string]interface{}{
+	response := map[string]any{
 		"status":  "ready",
 		"service": "user-service",
+		"message": "Service is ready to accept requests",
 	}
 
 	utils.RespondWithJSON(w, http.StatusOK, response)

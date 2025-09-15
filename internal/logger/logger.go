@@ -1,49 +1,51 @@
 package logger
 
 import (
-	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 type Logger struct {
-	*slog.Logger
+	*logrus.Entry
 }
 
 func New(level string) *Logger {
-	var logLevel slog.Level
+	logger := logrus.New()
 
-	switch strings.ToLower(level) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "info":
-		logLevel = slog.LevelInfo
-	case "warn", "warning":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	default:
-		logLevel = slog.LevelInfo
+	logLevel, err := logrus.ParseLevel(strings.ToLower(level))
+	if err != nil {
+		logLevel = logrus.InfoLevel
+	}
+	logger.SetLevel(logLevel)
+
+	if isProduction() {
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		logger.SetFormatter(&logrus.TextFormatter{
+			ForceColors:     true,
+			FullTimestamp:   true,
+			TimestampFormat: "2006-01-02 15:04:05",
+		})
 	}
 
-	opts := &slog.HandlerOptions{
-		Level: logLevel,
-	}
-
-	handler := slog.NewJSONHandler(os.Stdout, opts)
-	logger := slog.New(handler)
-
-	return &Logger{Logger: logger}
+	return &Logger{Entry: logrus.NewEntry(logger)}
 }
 
 func (l *Logger) WithService(serviceName string) *Logger {
-	return &Logger{
-		Logger: l.Logger.With("service", serviceName),
-	}
+	return &Logger{Entry: l.Entry.WithField("service", serviceName)}
 }
 
 func (l *Logger) WithRequestID(requestID string) *Logger {
-	return &Logger{
-		Logger: l.Logger.With("request_id", requestID),
-	}
+	return &Logger{Entry: l.Entry.WithField("request_id", requestID)}
+}
+
+func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
+	return &Logger{Entry: l.Entry.WithFields(logrus.Fields(fields))}
+}
+
+func isProduction() bool {
+	env := strings.ToLower(os.Getenv("ENVIRONMENT"))
+	return env == "production" || env == "prod"
 }
