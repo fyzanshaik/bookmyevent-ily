@@ -1,4 +1,4 @@
-.PHONY: help build migrate sqlc test docker-up docker-down run kill-services check-env
+.PHONY: help build migrate sqlc test docker-up docker-down run kill-services check-env kill-all
 
 check-env:
 	@if [ ! -f .env ]; then \
@@ -13,6 +13,11 @@ kill-services:
 	@lsof -ti:8003 | xargs kill -9 2>/dev/null || true
 	@lsof -ti:8004 | xargs kill -9 2>/dev/null || true
 
+kill-all:
+	@for p in 8001 8002 8003 8004; do \
+		lsof -ti:$$p | xargs kill -9 2>/dev/null || true; \
+	done
+
 help:
 	@echo "Available commands:"
 	@echo "  make docker-up                         - Start PostgreSQL database"
@@ -20,6 +25,7 @@ help:
 	@echo "  make docker-full-up                    - Start all infrastructure (PostgreSQL + Redis + Elasticsearch)"
 	@echo "  make docker-down                       - Stop all containers"
 	@echo "  make kill-services                     - Stop all running services"
+	@echo "  make kill-all                          - Kill processes on ports 8001-8004"
 	@echo "  make clean-data                        - Clean all data from databases"
 	@echo "  make migrate-up SERVICE=booking        - Run migrations for service (user|event|booking)"
 	@echo "  make migrate-down SERVICE=booking      - Rollback migrations"
