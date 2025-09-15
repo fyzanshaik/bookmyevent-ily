@@ -44,6 +44,7 @@ func (cfg *APIConfig) HandleInternalVerify(w http.ResponseWriter, r *http.Reques
 	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
+// TODO: Maybe I should remove sending back phone number, why would I use it
 func (cfg *APIConfig) HandleInternalGetUser(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.PathValue("userId")
 	if userIDStr == "" {

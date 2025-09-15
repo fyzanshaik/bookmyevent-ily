@@ -34,6 +34,19 @@ func (cfg *APIConfig) AddUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userExists, err := cfg.DB.CheckUserExists(r.Context(), cfg.DB_Conn, requestBody.Email)
+	if err != nil {
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email, "error": err.Error()}).Error("Failed to check if user exists")
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error checking user existence")
+		return
+	}
+
+	if userExists {
+		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email}).Warn("Registration attempt with existing email")
+		utils.RespondWithError(w, http.StatusConflict, "User with this email already exists")
+		return
+	}
+
 	var phoneNumber sql.NullString
 	if requestBody.PhoneNumber != "" {
 		phoneNumber = sql.NullString{String: requestBody.PhoneNumber, Valid: true}
@@ -49,7 +62,7 @@ func (cfg *APIConfig) AddUser(w http.ResponseWriter, r *http.Request) {
 	dbUser, err := cfg.DB.CreateUser(r.Context(), cfg.DB_Conn, params)
 	if err != nil {
 		cfg.Logger.WithFields(map[string]any{"email": requestBody.Email, "error": err.Error()}).Error("User creation failed")
-		utils.RespondWithError(w, http.StatusInternalServerError, "Could not create user")
+		utils.RespondWithError(w, http.StatusInternalServerError, "Error creating user")
 		return
 	}
 
@@ -353,6 +366,7 @@ func (cfg *APIConfig) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, http.StatusOK, response)
 }
 
+// TODO: Get user bookings from booking db
 func (cfg *APIConfig) GetUserBookings(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.GetUserIDFromContext(r.Context())
 	if !ok {

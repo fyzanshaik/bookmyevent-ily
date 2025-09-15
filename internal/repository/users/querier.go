@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	CheckUserExists(ctx context.Context, db DBTX, email string) (bool, error)
 	CleanupExpiredTokens(ctx context.Context, db DBTX) error
 	CreateRefreshToken(ctx context.Context, db DBTX, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateUser(ctx context.Context, db DBTX, arg CreateUserParams) (User, error)

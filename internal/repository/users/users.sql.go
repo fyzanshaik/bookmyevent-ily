@@ -12,6 +12,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkUserExists = `-- name: CheckUserExists :one
+SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND is_active = true) as exists
+`
+
+func (q *Queries) CheckUserExists(ctx context.Context, db DBTX, email string) (bool, error) {
+	row := db.QueryRowContext(ctx, checkUserExists, email)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     email,
@@ -140,7 +151,7 @@ func (q *Queries) UpdateUser(ctx context.Context, db DBTX, arg UpdateUserParams)
 
 const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
-SET 
+SET
     password_hash = $2,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1

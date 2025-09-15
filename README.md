@@ -32,6 +32,20 @@ This project is managed with `make` and `docker-compose`. Ensure you have Docker
 
 For a full list of commands (e.g., running individual services, managing migrations), see the `DEV_COMMANDS_REFERENCE.md` or run `make help`.
 
+## 🌱 Database Seeding
+
+The project includes a comprehensive database seeding script that populates the system with test data:
+
+```bash
+make seed-db
+```
+
+This creates:
+- 2 test users (`atlanuser1@mail.com`, `atlanuser2@mail.com`)
+- 1 admin user (`atlanadmin@mail.com`)
+- 10 Indian venues with varying capacities
+- 25 events (20 published, 5 draft)
+
 ## 🛠️ Tech Stack
 
 - **Backend**: Go

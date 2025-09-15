@@ -26,6 +26,7 @@ func SetupRoutes(config *APIConfig) *http.ServeMux {
 	mux.HandleFunc("POST /api/v1/auth/admin/refresh", config.AdminRefreshToken)
 	mux.HandleFunc("POST /api/v1/auth/admin/logout", config.AdminLogout)
 
+	//Never to be used by the client, added only for testing purposed and a fallback from using elastisearch
 	mux.HandleFunc("GET /api/v1/events", config.ListPublishedEvents)
 	mux.HandleFunc("GET /api/v1/events/{id}", config.GetEventByID)
 	mux.HandleFunc("GET /api/v1/events/{id}/availability", config.GetEventAvailability)
@@ -35,6 +36,7 @@ func SetupRoutes(config *APIConfig) *http.ServeMux {
 	mux.HandleFunc("PUT /api/v1/admin/events/{id}", adminAuth(config.UpdateEvent))
 	mux.HandleFunc("DELETE /api/v1/admin/events/{id}", adminAuth(config.DeleteEvent))
 	mux.HandleFunc("GET /api/v1/admin/events", adminAuth(config.ListAdminEvents))
+	//Analytics KEY DO NOT FORGET TO ADD INC CLIENT
 	mux.HandleFunc("GET /api/v1/admin/events/{id}/analytics", adminAuth(config.GetEventAnalytics))
 
 	mux.HandleFunc("POST /api/v1/admin/venues", adminAuth(config.CreateVenue))

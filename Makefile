@@ -1,4 +1,4 @@
-.PHONY: help build migrate sqlc test docker-up docker-down run kill-services check-env kill-all
+.PHONY: help build migrate sqlc test docker-up docker-down run kill-services check-env kill-all run-all-bin
 
 check-env:
 	@if [ ! -f .env ]; then \
@@ -20,23 +20,65 @@ kill-all:
 
 help:
 	@echo "Available commands:"
+	@echo ""
+	@echo "🐳 Docker & Infrastructure:"
 	@echo "  make docker-up                         - Start PostgreSQL database"
 	@echo "  make docker-redis-up                   - Start Redis"
 	@echo "  make docker-full-up                    - Start all infrastructure (PostgreSQL + Redis + Elasticsearch)"
 	@echo "  make docker-down                       - Stop all containers"
+	@echo "  make docker-logs                       - Show container logs"
+	@echo ""
+	@echo "🛠️  Service Management:"
 	@echo "  make kill-services                     - Stop all running services"
 	@echo "  make kill-all                          - Kill processes on ports 8001-8004"
-	@echo "  make clean-data                        - Clean all data from databases"
+	@echo "  make run SERVICE=booking-service       - Run specific service"
+	@echo "  make run-all-bg                        - Run all services in background (from source)"
+	@echo "  make run-all-bin                       - Run all services in background (from bin/)"
+	@echo ""
+	@echo "🏗️  Build & Development:"
+	@echo "  make build SERVICE=booking-service     - Build specific service"
+	@echo "  make build-all                         - Build all services"
+	@echo "  make clean                             - Clean build artifacts"
+	@echo "  make tidy                              - Tidy Go modules"
+	@echo ""
+	@echo "🗄️  Database & Migrations:"
 	@echo "  make migrate-up SERVICE=booking        - Run migrations for service (user|event|booking)"
 	@echo "  make migrate-down SERVICE=booking      - Rollback migrations"
+	@echo "  make migrate-status SERVICE=booking    - Check migration status"
+	@echo "  make migrate-up-user                   - Run user service migrations"
+	@echo "  make migrate-up-event                  - Run event service migrations"
+	@echo "  make migrate-up-booking                - Run booking service migrations"
+	@echo "  make migrate-up-all                    - Run all migrations"
+	@echo ""
+	@echo "🔧 Code Generation:"
 	@echo "  make sqlc SERVICE=booking              - Generate SQLC for service"
-	@echo "  make build SERVICE=booking-service     - Build specific service"
-	@echo "  make run SERVICE=booking-service       - Run specific service"
+	@echo "  make sqlc-user                         - Generate SQLC for user service"
+	@echo "  make sqlc-event                        - Generate SQLC for event service"
+	@echo "  make sqlc-booking                      - Generate SQLC for booking service"
+	@echo "  make sqlc-all                          - Generate SQLC for all services"
+	@echo "  make generate                          - Generate all code"
+	@echo ""
+	@echo "🧪 Testing:"
 	@echo "  make test                              - Run all tests"
+	@echo "  make test-service SERVICE=booking      - Run tests for specific service"
+	@echo ""
+	@echo "🌱 Data Management:"
+	@echo "  make clean-data                        - Clean all data from databases"
+	@echo "  make seed-data                         - Basic data seeding (users + admin)"
+	@echo "  make seed-db                           - Comprehensive database seeding (users, admin, venues, events)"
+	@echo ""
+	@echo "🚀 Development Setup:"
 	@echo "  make dev-setup                         - Setup development environment"
 	@echo "  make dev-setup-full                    - Full development setup with data seeding"
 	@echo "  make booking-dev-setup                 - Setup booking service development"
+	@echo "  make install-tools                     - Install development tools (SQLC, Goose)"
+	@echo ""
+	@echo "🔍 Monitoring & Utilities:"
 	@echo "  make redis-cli                         - Connect to Redis CLI"
+	@echo "  make redis-monitor                     - Monitor Redis commands"
+	@echo "  make elasticsearch-health              - Check Elasticsearch cluster health"
+	@echo "  make elasticsearch-indices             - List Elasticsearch indices"
+	@echo "  make elasticsearch-logs                - Show Elasticsearch logs"
 
 docker-up: check-env
 	@echo "Starting PostgreSQL database..."
@@ -269,6 +311,19 @@ run-all-bg: check-env
 	@(cd frontend && bun run dev &)
 	@echo "All services are running in the background."
 
+# Run all services from bin directory
+run-all-bin: check-env
+	@echo "Running all services from bin directory in the background..."
+	@if [ ! -f bin/user-service ]; then \
+		echo "Building all services first..."; \
+		make build-all; \
+	fi
+	@export $$(cat .env | grep -v '^#' | xargs) && ./bin/user-service &
+	@export $$(cat .env | grep -v '^#' | xargs) && ./bin/event-service &
+	@export $$(cat .env | grep -v '^#' | xargs) && ./bin/booking-service &
+	@export $$(cat .env | grep -v '^#' | xargs) && ./bin/search-service &
+	@echo "All services are running in the background from bin directory."
+
 seed-data:
 	@echo "Seeding data..."
 	@echo "Creating user 1 (atlanuser1@mail.com)..."
@@ -278,6 +333,10 @@ seed-data:
 	@echo "Creating admin (atlanadmin@mail.com)..."
 	@curl -s -X POST -H "Content-Type: application/json" -d '{"email": "atlanadmin@mail.com", "password": "11111111", "name": "Atlan Admin"}' http://localhost:8002/api/v1/auth/admin/register > /dev/null
 	@echo "Data seeded successfully."
+
+seed-db:
+	@echo "Running comprehensive database seeding..."
+	@./scripts/seed_database.sh
 
 dev-setup-full:
 	@make docker-full-up
