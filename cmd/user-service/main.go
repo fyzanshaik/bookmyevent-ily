@@ -51,6 +51,7 @@ func validateUserEnv() {
 		if os.Getenv(env) == "" {
 			missing = append(missing, env)
 		}
+		
 	}
 
 	if len(missing) > 0 {
