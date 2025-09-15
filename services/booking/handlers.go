@@ -45,18 +45,21 @@ func (cfg *APIConfig) CheckAvailability(w http.ResponseWriter, r *http.Request) 
 	quantityStr := r.URL.Query().Get("quantity")
 
 	if eventIDStr == "" || quantityStr == "" {
+		cfg.Logger.Warn("Availability check with missing parameters")
 		utils.RespondWithError(w, http.StatusBadRequest, "event_id and quantity are required")
 		return
 	}
 
 	eventID, err := uuid.Parse(eventIDStr)
 	if err != nil {
+		cfg.Logger.WithFields(map[string]any{"event_id_str": eventIDStr, "error": err.Error()}).Warn("Invalid event ID in availability check")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid event_id format")
 		return
 	}
 
 	quantity, err := strconv.ParseInt(quantityStr, 10, 32)
 	if err != nil || quantity <= 0 {
+		cfg.Logger.WithFields(map[string]any{"quantity_str": quantityStr, "event_id": eventID}).Warn("Invalid quantity in availability check")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid quantity")
 		return
 	}
@@ -112,16 +115,19 @@ func (cfg *APIConfig) ReserveSeats(w http.ResponseWriter, r *http.Request) {
 
 	var req ReservationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error(), "user_id": userID}).Warn("Invalid JSON in seat reservation")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if req.EventID == uuid.Nil || req.Quantity <= 0 || req.IdempotencyKey == "" {
+		cfg.Logger.WithFields(map[string]any{"user_id": userID, "event_id": req.EventID, "quantity": req.Quantity}).Warn("Seat reservation with missing required fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "event_id, quantity, and idempotency_key are required")
 		return
 	}
 
 	if req.Quantity > int32(cfg.Config.MaxTicketsPerUser) {
+		cfg.Logger.WithFields(map[string]any{"user_id": userID, "event_id": req.EventID, "quantity": req.Quantity, "max_allowed": cfg.Config.MaxTicketsPerUser}).Warn("Seat reservation exceeds maximum allowed")
 		utils.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("Maximum %d tickets allowed per booking", cfg.Config.MaxTicketsPerUser))
 		return
 	}
@@ -262,11 +268,13 @@ func (cfg *APIConfig) ConfirmBooking(w http.ResponseWriter, r *http.Request) {
 
 	var req ConfirmationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		cfg.Logger.WithFields(map[string]any{"error": err.Error(), "user_id": userID}).Warn("Invalid JSON in booking confirmation")
 		utils.RespondWithError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
 	if req.ReservationID == uuid.Nil || req.PaymentToken == "" || req.PaymentMethod == "" {
+		cfg.Logger.WithFields(map[string]any{"user_id": userID, "reservation_id": req.ReservationID}).Warn("Booking confirmation with missing required fields")
 		utils.RespondWithError(w, http.StatusBadRequest, "reservation_id, payment_token, and payment_method are required")
 		return
 	}
