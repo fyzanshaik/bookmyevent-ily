@@ -1,4 +1,4 @@
-.PHONY: help build migrate sqlc test run kill-services check-env migrate-up-all build-all
+.PHONY: help build migrate sqlc test run client-run client-install kill-services check-env migrate-up-all build-all
 
 check-env:
 	@if [ ! -f .env ]; then \
@@ -20,6 +20,8 @@ help:
 	@echo "  make build SERVICE=booking-service     - Build specific service"
 	@echo "  make build-all                         - Build all services"
 	@echo "  make run SERVICE=booking-service       - Run specific service"
+	@echo "  make client-install                    - Install frontend dependencies"
+	@echo "  make client-run                        - Run frontend development server"
 	@echo "  make kill-services                     - Stop all running services"
 	@echo "  make clean                             - Clean build artifacts"
 	@echo "  make tidy                              - Tidy Go modules"
@@ -105,6 +107,14 @@ run: check-env
 		exit 1; \
 	fi
 	@export $$(cat .env | grep -v '^#' | xargs) && go run ./cmd/$(SERVICE)/main.go
+
+client-run:
+	@echo "Starting frontend development server..."
+	@cd frontend && bun run dev
+
+client-install:
+	@echo "Installing frontend dependencies..."
+	@cd frontend && bun install
 
 test:
 	@go test -v ./...
