@@ -1,31 +1,34 @@
 import axios from 'axios';
 
-// Base URLs for different services
-const API_URLS = {
-  USER_SERVICE: 'http://localhost:8001',
-  EVENT_SERVICE: 'http://localhost:8002', 
-  SEARCH_SERVICE: 'http://localhost:8003',
-  BOOKING_SERVICE: 'http://localhost:8004'
+// API Gateway Base URL - All requests go through nginx gateway
+const API_GATEWAY_URL = import.meta.env.VITE_API_URL || 'http://localhost';
+
+// Gateway routes for different services
+const API_ROUTES = {
+  USER: '/api/user',
+  EVENT: '/api/event',
+  SEARCH: '/api/search',
+  BOOKING: '/api/booking'
 };
 
-// Create axios instances for each service
+// Create axios instances for each service (all through gateway)
 const userAPI = axios.create({
-  baseURL: API_URLS.USER_SERVICE,
+  baseURL: `${API_GATEWAY_URL}${API_ROUTES.USER}`,
   headers: { 'Content-Type': 'application/json' }
 });
 
 const eventAPI = axios.create({
-  baseURL: API_URLS.EVENT_SERVICE,
+  baseURL: `${API_GATEWAY_URL}${API_ROUTES.EVENT}`,
   headers: { 'Content-Type': 'application/json' }
 });
 
 const searchAPI = axios.create({
-  baseURL: API_URLS.SEARCH_SERVICE,
+  baseURL: `${API_GATEWAY_URL}${API_ROUTES.SEARCH}`,
   headers: { 'Content-Type': 'application/json' }
 });
 
 const bookingAPI = axios.create({
-  baseURL: API_URLS.BOOKING_SERVICE,
+  baseURL: `${API_GATEWAY_URL}${API_ROUTES.BOOKING}`,
   headers: { 'Content-Type': 'application/json' }
 });
 
@@ -55,7 +58,7 @@ const addResponseInterceptor = (apiInstance) => {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
           try {
-            const response = await userAPI.post('/api/v1/auth/refresh', {
+            const response = await userAPI.post('/auth/refresh', {
               refresh_token: refreshToken
             });
             
@@ -83,9 +86,9 @@ addResponseInterceptor(userAPI);
 addResponseInterceptor(eventAPI);
 addResponseInterceptor(bookingAPI);
 
-// Admin API interceptor setup
+// Admin API interceptor setup (also through gateway)
 const adminAPI = axios.create({
-  baseURL: API_URLS.EVENT_SERVICE,
+  baseURL: `${API_GATEWAY_URL}${API_ROUTES.EVENT}`,
   headers: { 'Content-Type': 'application/json' }
 });
 
@@ -106,7 +109,7 @@ adminAPI.interceptors.response.use(
       const refreshToken = localStorage.getItem('admin_refresh_token');
       if (refreshToken) {
         try {
-          const response = await eventAPI.post('/api/v1/auth/admin/refresh', {
+          const response = await eventAPI.post('/auth/admin/refresh', {
             refresh_token: refreshToken
           });
           
@@ -133,87 +136,83 @@ adminAPI.interceptors.response.use(
 
 export const userService = {
   // Authentication
-  register: (userData) => userAPI.post('/api/v1/auth/register', userData),
-  login: (credentials) => userAPI.post('/api/v1/auth/login', credentials),
-  logout: (refreshToken) => userAPI.post('/api/v1/auth/logout', { refresh_token: refreshToken }),
-  refreshToken: (refreshToken) => userAPI.post('/api/v1/auth/refresh', { refresh_token: refreshToken }),
-  
+  register: (userData) => userAPI.post('/auth/register', userData),
+  login: (credentials) => userAPI.post('/auth/login', credentials),
+  logout: (refreshToken) => userAPI.post('/auth/logout', { refresh_token: refreshToken }),
+  refreshToken: (refreshToken) => userAPI.post('/auth/refresh', { refresh_token: refreshToken }),
+
   // Profile
-  getProfile: () => userAPI.get('/api/v1/users/profile'),
-  updateProfile: (profileData) => userAPI.put('/api/v1/users/profile', profileData),
-  getUserBookings: () => userAPI.get('/api/v1/users/bookings'),
-  
-  // Health
-  health: () => userAPI.get('/healthz'),
-  healthReady: () => userAPI.get('/health/ready')
+  getProfile: () => userAPI.get('/users/profile'),
+  updateProfile: (profileData) => userAPI.put('/users/profile', profileData),
+  getUserBookings: () => userAPI.get('/users/bookings'),
+
+  // Health (via gateway)
+  health: () => userAPI.get('/healthz')
 };
 
 // ==================== EVENT SERVICE APIs ====================
 
 export const eventService = {
   // Admin Authentication
-  adminRegister: (adminData) => eventAPI.post('/api/v1/auth/admin/register', adminData),
-  adminLogin: (credentials) => eventAPI.post('/api/v1/auth/admin/login', credentials),
-  adminRefresh: (refreshToken) => eventAPI.post('/api/v1/auth/admin/refresh', { refresh_token: refreshToken }),
-  
+  adminRegister: (adminData) => eventAPI.post('/auth/admin/register', adminData),
+  adminLogin: (credentials) => eventAPI.post('/auth/admin/login', credentials),
+  adminRefresh: (refreshToken) => eventAPI.post('/auth/admin/refresh', { refresh_token: refreshToken }),
+
   // Venues (Admin)
-  createVenue: (venueData) => adminAPI.post('/api/v1/admin/venues', venueData),
-  getVenues: (params = {}) => adminAPI.get('/api/v1/admin/venues', { params }),
-  updateVenue: (venueId, venueData) => adminAPI.put(`/api/v1/admin/venues/${venueId}`, venueData),
-  deleteVenue: (venueId) => adminAPI.delete(`/api/v1/admin/venues/${venueId}`),
-  
+  createVenue: (venueData) => adminAPI.post('/admin/venues', venueData),
+  getVenues: (params = {}) => adminAPI.get('/admin/venues', { params }),
+  updateVenue: (venueId, venueData) => adminAPI.put(`/admin/venues/${venueId}`, venueData),
+  deleteVenue: (venueId) => adminAPI.delete(`/admin/venues/${venueId}`),
+
   // Events (Admin)
-  createEvent: (eventData) => adminAPI.post('/api/v1/admin/events', eventData),
-  getAdminEvents: (params = {}) => adminAPI.get('/api/v1/admin/events', { params }),
-  updateEvent: (eventId, eventData) => adminAPI.put(`/api/v1/admin/events/${eventId}`, eventData),
-  deleteEvent: (eventId, version) => adminAPI.delete(`/api/v1/admin/events/${eventId}`, { data: { version } }),
-  
+  createEvent: (eventData) => adminAPI.post('/admin/events', eventData),
+  getAdminEvents: (params = {}) => adminAPI.get('/admin/events', { params }),
+  updateEvent: (eventId, eventData) => adminAPI.put(`/admin/events/${eventId}`, eventData),
+  deleteEvent: (eventId, version) => adminAPI.delete(`/admin/events/${eventId}`, { data: { version } }),
+
   // Public Events
-  getEvents: (params = {}) => eventAPI.get('/api/v1/events', { params }),
-  getEvent: (eventId) => eventAPI.get(`/api/v1/events/${eventId}`),
-  getEventAvailability: (eventId) => eventAPI.get(`/api/v1/events/${eventId}/availability`),
-  
-  // Health
-  health: () => eventAPI.get('/healthz'),
-  healthReady: () => eventAPI.get('/health/ready')
+  getEvents: (params = {}) => eventAPI.get('/events', { params }),
+  getEvent: (eventId) => eventAPI.get(`/events/${eventId}`),
+  getEventAvailability: (eventId) => eventAPI.get(`/events/${eventId}/availability`),
+
+  // Health (via gateway)
+  health: () => eventAPI.get('/healthz')
 };
 
 // ==================== SEARCH SERVICE APIs ====================
 
 export const searchService = {
   // Search
-  search: (params = {}) => searchAPI.get('/api/v1/search', { params }),
-  getSuggestions: (params) => searchAPI.get('/api/v1/search/suggestions', { params }),
-  getFilters: () => searchAPI.get('/api/v1/search/filters'),
-  getTrending: (params = {}) => searchAPI.get('/api/v1/search/trending', { params }),
-  
-  // Health
-  health: () => searchAPI.get('/healthz'),
-  healthReady: () => searchAPI.get('/health/ready')
+  search: (params = {}) => searchAPI.get('/search', { params }),
+  getSuggestions: (params) => searchAPI.get('/search/suggestions', { params }),
+  getFilters: () => searchAPI.get('/search/filters'),
+  getTrending: (params = {}) => searchAPI.get('/search', { params }), // Use regular search for trending
+
+  // Health (via gateway)
+  health: () => searchAPI.get('/healthz')
 };
 
 // ==================== BOOKING SERVICE APIs ====================
 
 export const bookingService = {
   // Availability
-  checkAvailability: (params) => bookingAPI.get('/api/v1/bookings/check-availability', { params }),
-  
+  checkAvailability: (params) => bookingAPI.get('/bookings/check-availability', { params }),
+
   // Booking Flow
-  reserve: (bookingData) => bookingAPI.post('/api/v1/bookings/reserve', bookingData),
-  confirm: (confirmData) => bookingAPI.post('/api/v1/bookings/confirm', confirmData),
-  getBooking: (bookingId) => bookingAPI.get(`/api/v1/bookings/${bookingId}`),
-  cancelBooking: (bookingId) => bookingAPI.delete(`/api/v1/bookings/${bookingId}`),
-  expireReservation: (reservationId) => bookingAPI.post(`/api/v1/bookings/${reservationId}/expire`),
-  getUserBookings: (userId, params = {}) => bookingAPI.get(`/api/v1/bookings/user/${userId}`, { params }),
-  
+  reserve: (bookingData) => bookingAPI.post('/bookings/reserve', bookingData),
+  confirm: (confirmData) => bookingAPI.post('/bookings/confirm', confirmData),
+  getBooking: (bookingId) => bookingAPI.get(`/bookings/${bookingId}`),
+  cancelBooking: (bookingId) => bookingAPI.delete(`/bookings/${bookingId}`),
+  expireReservation: (reservationId) => bookingAPI.post(`/bookings/${reservationId}/expire`),
+  getUserBookings: (userId, params = {}) => bookingAPI.get(`/bookings/user/${userId}`, { params }),
+
   // Waitlist
-  joinWaitlist: (waitlistData) => bookingAPI.post('/api/v1/waitlist/join', waitlistData),
-  getWaitlistPosition: (params) => bookingAPI.get('/api/v1/waitlist/position', { params }),
-  leaveWaitlist: (waitlistData) => bookingAPI.delete('/api/v1/waitlist/leave', { data: waitlistData }),
-  
-  // Health
-  health: () => bookingAPI.get('/healthz'),
-  healthReady: () => bookingAPI.get('/health/ready')
+  joinWaitlist: (waitlistData) => bookingAPI.post('/waitlist/join', waitlistData),
+  getWaitlistPosition: (params) => bookingAPI.get('/waitlist/position', { params }),
+  leaveWaitlist: (waitlistData) => bookingAPI.delete('/waitlist/leave', { data: waitlistData }),
+
+  // Health (via gateway)
+  health: () => bookingAPI.get('/healthz')
 };
 
 // ==================== UTILITY FUNCTIONS ====================

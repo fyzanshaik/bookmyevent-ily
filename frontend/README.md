@@ -31,7 +31,7 @@ A React-based frontend for the BookMyEvent platform - a comprehensive event book
 ### Prerequisites
 
 - Node.js 18+ or Bun
-- Backend services running (User, Event, Search, Booking services)
+- Backend deployment running (via `make deploy-full`)
 
 ### Installation
 
@@ -45,14 +45,18 @@ bun run dev
 
 The application will be available at `http://localhost:3000`
 
-### Backend Services
+### Backend Gateway
 
-Make sure the following backend services are running:
+The frontend connects to all backend services through the **nginx API gateway**:
 
-- **User Service**: `http://localhost:8001`
-- **Event Service**: `http://localhost:8002`
-- **Search Service**: `http://localhost:8003`
-- **Booking Service**: `http://localhost:8004`
+- **API Gateway**: `http://localhost/` (port 80)
+- **All Services**: Accessible via gateway routes:
+  - User API: `http://localhost/api/user/`
+  - Event API: `http://localhost/api/event/`
+  - Search API: `http://localhost/api/search/`
+  - Booking API: `http://localhost/api/booking/`
+
+**✅ One-command backend setup**: `make deploy-full`
 
 ## Usage
 
@@ -80,16 +84,41 @@ The frontend integrates with the following backend services:
 - **Booking**: Two-phase booking with concurrency control
 - **Admin Operations**: Venue and event management
 
-## Demo Credentials
+## Demo Credentials (Auto-Created)
 
-### Admin Demo
+### Test Users
 ```
-Email: admin@bookmyevent.com
-Password: admin123
+Email: atlanuser1@mail.com
+Password: 11111111
+
+Email: atlanuser2@mail.com
+Password: 11111111
 ```
 
-### User Demo
-Create your own user account through the registration flow.
+### Admin
+```
+Email: atlanadmin@mail.com
+Password: 11111111
+```
+
+**✅ Test data**: 10 events automatically created and published
+
+## Environment Configuration
+
+The frontend automatically connects to the API gateway. For production deployment:
+
+### Development (.env)
+```env
+REACT_APP_API_URL=http://localhost
+```
+
+### Production (.env.production)
+```env
+# Change to your server URL
+REACT_APP_API_URL=http://your-server-ip
+# or
+REACT_APP_API_URL=https://your-domain.com
+```
 
 ## Development
 
