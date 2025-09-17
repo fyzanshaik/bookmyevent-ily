@@ -1,7 +1,7 @@
 
-# Evently - High-Performance Event Booking Platform
+# BookMyEvent - High-Performance Event Booking Platform
 
-Evently is a scalable, high-performance event booking platform designed to handle a large volume of concurrent ticket sales with zero overselling. It provides a robust backend system built on a microservices architecture, ensuring reliability and data consistency under pressure.
+BookMyEvent is a scalable, high-performance event booking platform designed to handle a large volume of concurrent ticket sales with zero overselling. It provides a robust backend system built on a microservices architecture with nginx API gateway, ensuring reliability and data consistency under pressure.
 
 ## ✨ Key Features
 
@@ -11,7 +11,78 @@ Evently is a scalable, high-performance event booking platform designed to handl
 - **Smart Waitlisting**: An automated queueing system for sold-out events to notify users when tickets become available.
 - **Two-Phase Booking**: A reserve-then-confirm workflow ensures a smooth and fair booking process.
 
-## 🚀 Getting Started
+## 🚀 Quick Start (Production Deployment)
+
+**One command deployment** - Ready for DigitalOcean or any Docker environment:
+
+```bash
+# Clone and deploy everything
+git clone <repository-url>
+cd bookmyevent-ily
+make deploy-full
+```
+
+**What this does:**
+1. ✅ Deploys all services via docker-compose
+2. ✅ Runs database migrations
+3. ✅ Seeds test data (2 users + 1 admin + 10 events)
+4. ✅ Ready for testing immediately
+
+**Access your deployment:**
+- **API Gateway**: `http://localhost/` (or `http://your-server-ip/`)
+- **API Documentation**: `http://localhost/` (shows all available endpoints)
+
+## 🌐 Client Access & API Gateway
+
+**All external access goes through the nginx gateway on port 80:**
+
+### Gateway Routes
+```
+http://localhost/api/user/     → User Service (auth, profiles)
+http://localhost/api/event/    → Event Service (events, venues)
+http://localhost/api/search/   → Search Service (event search)
+http://localhost/api/booking/  → Booking Service (reservations)
+http://localhost/health        → Gateway health check
+```
+
+### Frontend Integration
+```javascript
+// All requests go through the gateway
+const API_BASE = 'http://localhost'; // or your domain
+
+// Login user
+fetch(`${API_BASE}/api/user/auth/login`, {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({email: 'atlanuser1@mail.com', password: '11111111'})
+});
+
+// Search events
+fetch(`${API_BASE}/api/search/search?q=diwali`);
+
+// Book tickets
+fetch(`${API_BASE}/api/booking/reserve`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + token
+  },
+  body: JSON.stringify({event_id: 'EVENT_ID', quantity: 2})
+});
+```
+
+## 🧪 Test Data (Auto-Created)
+
+**Test Users:**
+- `atlanuser1@mail.com` / `11111111`
+- `atlanuser2@mail.com` / `11111111`
+
+**Admin:**
+- `atlanadmin@mail.com` / `11111111`
+
+**Events:** 10 diverse events (Diwali Festival, Tech Summit, Music Concert, etc.)
+
+## 🛠️ Development Setup
 
 This project is managed with `make` and `docker-compose`. Ensure you have Docker, Go, and `make` installed.
 
@@ -30,7 +101,26 @@ This project is managed with `make` and `docker-compose`. Ensure you have Docker
     make docker-down
     ```
 
-For a full list of commands (e.g., running individual services, managing migrations), see the `DEV_COMMANDS_REFERENCE.md` or run `make help`.
+For a full list of commands (e.g., running individual services, managing migrations), see `make help`.
+
+## 🚢 Production Deployment Commands
+
+```bash
+# Complete deployment (recommended)
+make deploy-full           # Deploy + migrate + seed (one command)
+
+# Step-by-step deployment
+make deploy-production     # Deploy services only
+make setup-db             # Run migrations only
+make seed-data-production # Seed test data only
+
+# Maintenance
+make reset-data           # Clean all data
+make stop-production      # Stop all services
+make status-production    # Check deployment status
+make logs-production      # View service logs
+make destroy-production   # Complete cleanup (including volumes)
+```
 
 ## 🌱 Database Seeding
 

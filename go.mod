@@ -1,6 +1,6 @@
 module github.com/fyzanshaik/bookmyevent-ily
 
-go 1.25.1
+go 1.24.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
@@ -11,7 +11,9 @@ require (
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.0
+	github.com/joho/godotenv v1.5.1
 	github.com/redis/go-redis/v9 v9.14.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/sqlc-dev/pqtype v0.3.0
 )
 
@@ -21,9 +23,6 @@ require (
 	github.com/elastic/elastic-transport-go/v8 v8.7.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/jackc/pgx/v5 v5.7.6 // indirect
-	github.com/joho/godotenv v1.5.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/metric v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect

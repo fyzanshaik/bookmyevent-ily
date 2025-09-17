@@ -74,6 +74,148 @@ services:
       timeout: 10s
       retries: 5
 
+  # BookMyEvent Microservices
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile-user-service
+    container_name: bookmyevent_user_service
+    # No external ports - only accessible via nginx gateway
+    environment:
+      - USER_SERVICE_DB_URL=postgresql://postgres:postgres@postgres:5432/users_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evently_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8001/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  event-service:
+    build:
+      context: .
+      dockerfile: Dockerfile-event-service
+    container_name: bookmyevent_event_service
+    # No external ports - only accessible via nginx gateway
+    environment:
+      - EVENT_SERVICE_DB_URL=postgresql://postgres:postgres@postgres:5432/events_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - SEARCH_SERVICE_URL=http://search-service:8003
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evently_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8002/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  search-service:
+    build:
+      context: .
+      dockerfile: Dockerfile-search-service
+    container_name: bookmyevent_search_service
+    # No external ports - only accessible via nginx gateway
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - REDIS_URL=redis://redis:6379
+      - ENVIRONMENT=production
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - evently_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8003/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  booking-service:
+    build:
+      context: .
+      dockerfile: Dockerfile-booking-service
+    container_name: bookmyevent_booking_service
+    # No external ports - only accessible via nginx gateway
+    environment:
+      - BOOKING_SERVICE_DB_URL=postgresql://postgres:postgres@postgres:5432/bookings_db?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - USER_SERVICE_URL=http://user-service:8001
+      - EVENT_SERVICE_URL=http://event-service:8002
+      - ENVIRONMENT=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+    networks:
+      - evently_network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8004/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx Gateway
+  nginx:
+    image: nginx:alpine
+    container_name: bookmyevent_gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      user-service:
+        condition: service_healthy
+      event-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      booking-service:
+        condition: service_healthy
+    networks:
+      - evently_network
+    restart: unless-stopped
+
+  # Initialization Container
+  init-container:
+    build:
+      context: .
+      dockerfile: Dockerfile-init-container
+    container_name: bookmyevent_init
+    environment:
+      - USER_SERVICE_URL=http://user-service:8001
+      - EVENT_SERVICE_URL=http://event-service:8002
+      - SEARCH_SERVICE_URL=http://search-service:8003
+      - BOOKING_SERVICE_URL=http://booking-service:8004
+    depends_on:
+      - nginx
+    networks:
+      - evently_network
+    restart: "no"
+
 volumes:
   postgres_data:
   redis_data:

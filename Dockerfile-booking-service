@@ -1,0 +1,39 @@
+# Build stage
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+# Install git for go modules
+RUN apk add --no-cache git
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build the booking service binary
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o booking-service ./cmd/booking-service
+
+# Final stage
+FROM alpine:latest
+
+# Install ca-certificates and wget for health checks
+RUN apk --no-cache add ca-certificates wget
+
+WORKDIR /root/
+
+# Copy the binary from builder
+COPY --from=builder /app/booking-service .
+
+# Copy the .env file for configuration
+COPY --from=builder /app/.env .
+
+# Expose port
+EXPOSE 8004
+
+# Run the binary
+CMD ["./booking-service"]
